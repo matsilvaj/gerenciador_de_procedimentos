@@ -1,6 +1,6 @@
 import sys
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
-                               QHBoxLayout, QPushButton, QStackedWidget, QLabel)
+                               QHBoxLayout, QPushButton, QStackedWidget)
 from PySide6.QtCore import Qt
 from telas.procedimentos import TelaProcedimentos
 from telas.dashboard import TelaDashboard
@@ -23,38 +23,28 @@ class MainWindow(QMainWindow):
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(0)
 
-        # --- Top Bar ---
         top_bar = QWidget()
         top_bar.setObjectName("topBar")
         top_bar_layout = QHBoxLayout(top_bar)
-        top_bar_layout.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
         top_bar_layout.setAlignment(Qt.AlignCenter)
-        top_bar_layout.setContentsMargins(30, 15, 30, 15)
-        top_bar_layout.setSpacing(30)
+        top_bar_layout.setContentsMargins(0, 15, 0, 15)
+        top_bar_layout.setSpacing(10)
 
-        # Criando os Botões na Nova Ordem
         self.btn_dashboard = QPushButton("Dashboard")
         self.btn_procedimentos = QPushButton("Procedimentos")
-        self.btn_freebets = QPushButton("Freebets") # Invertido
-        self.btn_historico = QPushButton("Histórico") # Invertido
+        self.btn_freebets = QPushButton("Freebets")
+        self.btn_historico = QPushButton("Histórico")
 
-        self.btn_dashboard.setCheckable(True)
-        self.btn_procedimentos.setCheckable(True)
-        self.btn_freebets.setCheckable(True)
-        self.btn_historico.setCheckable(True)
+        for btn in [self.btn_dashboard, self.btn_procedimentos, self.btn_freebets, self.btn_historico]:
+            btn.setCheckable(True)
+            btn.setCursor(Qt.PointingHandCursor)
+            top_bar_layout.addWidget(btn)
 
-        top_bar_layout.addWidget(self.btn_dashboard)
-        top_bar_layout.addWidget(self.btn_procedimentos)
-        top_bar_layout.addWidget(self.btn_freebets)
-        top_bar_layout.addWidget(self.btn_historico)
-
-        # --- Gerenciador de Telas ---
         self.telas = QStackedWidget()
-
         self.tela_dashboard = TelaDashboard()
         self.tela_procedimentos = TelaProcedimentos()
-        self.tela_freebets = TelaFreebets() # Invertido
-        self.tela_historico = TelaHistorico() # Invertido
+        self.tela_freebets = TelaFreebets()
+        self.tela_historico = TelaHistorico()
 
         self.telas.addWidget(self.tela_dashboard)
         self.telas.addWidget(self.tela_procedimentos)
@@ -64,7 +54,6 @@ class MainWindow(QMainWindow):
         main_layout.addWidget(top_bar)
         main_layout.addWidget(self.telas)
 
-        # --- Conectando os Cliques ---
         self.btn_dashboard.clicked.connect(lambda: self.mudar_tela(self.btn_dashboard, self.tela_dashboard))
         self.btn_procedimentos.clicked.connect(lambda: self.mudar_tela(self.btn_procedimentos, self.tela_procedimentos))
         self.btn_freebets.clicked.connect(lambda: self.mudar_tela(self.btn_freebets, self.tela_freebets))
@@ -74,53 +63,43 @@ class MainWindow(QMainWindow):
         self.mudar_tela(self.btn_dashboard, self.tela_dashboard)
 
     def aplicar_estilo(self):
+        # A MÁGICA DA FONTE SUAVE: Aplicada a todo o app (*)
         estilo = """
-        QMainWindow {
-            background-color: #0f111a;
+        * {
+            font-family: 'Inter', 'Segoe UI Variable', 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
         }
-        #topBar {
-            background-color: #161925;
-            border-bottom: 1px solid #282c38;
-        }
+        QMainWindow { background-color: #09090b; }
+        #topBar { background-color: #09090b; border-bottom: 1px solid rgba(255,255,255,0.03); }
         QPushButton {
             background-color: transparent;
-            color: #7b849b;
-            font-size: 16px;
-            font-weight: bold;
-            font-family: 'Segoe UI', sans-serif;
-            padding: 8px 10px;
+            color: #a1a1aa;
+            font-size: 14px;
+            font-weight: 600;
+            padding: 8px 16px;
             border: none;
-            border-bottom: 3px solid transparent;
+            border-radius: 6px;
         }
-        QPushButton:hover {
-            color: #ffffff;
-        }
+        QPushButton:hover { background-color: rgba(255,255,255,0.05); color: #f4f4f5; }
         QPushButton:checked {
-            color: #00e676;
-            border-bottom: 3px solid #00e676;
+            background-color: rgba(255,255,255,0.03);
+            color: #f4f4f5;
+            border: 1px solid rgba(255,255,255,0.05);
         }
         """
         self.setStyleSheet(estilo)
         
     def mudar_tela(self, botao_ativo, tela_alvo):
-        """Muda a tela ativa e atualiza os dados automaticamente."""
         self.btn_dashboard.setChecked(False)
         self.btn_procedimentos.setChecked(False)
         self.btn_freebets.setChecked(False)
         self.btn_historico.setChecked(False)
-        
         botao_ativo.setChecked(True)
         self.telas.setCurrentWidget(tela_alvo)
 
-        # Atualiza a aba que está sendo aberta no momento
-        if tela_alvo == self.tela_dashboard:
-            self.tela_dashboard.atualizar_dados()
-        elif tela_alvo == self.tela_procedimentos:
-            self.tela_procedimentos.carregar_tabela()
-        elif tela_alvo == self.tela_freebets:
-            self.tela_freebets.carregar_freebets_ativas()
-        elif tela_alvo == self.tela_historico:
-            self.tela_historico.atualizar_lista_meses()
+        if tela_alvo == self.tela_dashboard: self.tela_dashboard.atualizar_dados()
+        elif tela_alvo == self.tela_procedimentos: self.tela_procedimentos.carregar_tabela()
+        elif tela_alvo == self.tela_freebets: self.tela_freebets.carregar_freebets_ativas()
+        elif tela_alvo == self.tela_historico: self.tela_historico.atualizar_lista_meses()
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
