@@ -10,7 +10,6 @@ class TelaHistorico(QWidget):
         layout.setContentsMargins(20, 20, 20, 20)
         layout.setSpacing(20)
 
-        # --- 1. Topo: Seleção de Período ---
         topo_layout = QHBoxLayout()
         lbl_titulo = QLabel("Arquivo Histórico")
         lbl_titulo.setStyleSheet("color: white; font-size: 22px; font-weight: bold;")
@@ -26,7 +25,6 @@ class TelaHistorico(QWidget):
         topo_layout.addWidget(self.combo_meses)
         layout.addLayout(topo_layout)
 
-        # --- 2. Card de Resumo do Mês Selecionado ---
         self.card_resumo = QFrame()
         self.card_resumo.setStyleSheet("background-color: #1a1d2d; border-radius: 8px; border: 1px solid #282c38;")
         self.card_resumo.setFixedHeight(100)
@@ -44,17 +42,24 @@ class TelaHistorico(QWidget):
         layout_resumo.addWidget(lbl_desc)
         layout.addWidget(self.card_resumo)
 
-        # --- 3. Tabela de Registros ---
         self.tabela = QTableWidget(0, 5)
         self.tabela.setHorizontalHeaderLabels(["Data", "Tipo", "Jogo / Casas", "Lucro Base", "Lucro Final"])
         self.tabela.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.tabela.verticalHeader().setVisible(False)
         self.tabela.setEditTriggers(QTableWidget.NoEditTriggers)
-        self.tabela.setStyleSheet("background-color: #1a1d2d; color: white; border: none; gridline-color: #282c38;")
+        
+        # Hover Linha
+        self.tabela.setSelectionBehavior(QTableWidget.SelectRows)
+        self.tabela.setSelectionMode(QTableWidget.SingleSelection) 
+        self.tabela.setStyleSheet("""
+            QTableWidget { background-color: #1a1d2d; color: white; border: none; gridline-color: #282c38; outline: none; }
+            QTableWidget::item:selected { background-color: #282c38; }
+        """)
+        self.tabela.setMouseTracking(True)
+        self.tabela.cellEntered.connect(lambda r, c: self.tabela.selectRow(r))
         layout.addWidget(self.tabela)
 
     def atualizar_lista_meses(self):
-        """Atualiza o dropdown com os meses que existem no banco."""
         self.combo_meses.blockSignals(True)
         self.combo_meses.clear()
         meses = database.listar_meses_disponiveis()
@@ -76,13 +81,13 @@ class TelaHistorico(QWidget):
             data, tipo, jogo, casas, lucro_base, v_duplo, bateu = reg
             self.tabela.insertRow(row)
             
-            # Cálculo do Lucro Final do registro
             l_final = lucro_base + (v_duplo if bateu else 0)
             lucro_acumulado += l_final
             
             def item(t, c=None):
                 it = QTableWidgetItem(str(t))
                 it.setTextAlignment(Qt.AlignCenter)
+                it.setToolTip(str(t)) # Tooltip de Expansão
                 if c: it.setForeground(c)
                 return it
 
@@ -92,6 +97,5 @@ class TelaHistorico(QWidget):
             self.tabela.setItem(row, 3, item(f"R$ {lucro_base:.2f}"))
             self.tabela.setItem(row, 4, item(f"R$ {l_final:.2f}", Qt.green if l_final >= 0 else Qt.red))
 
-        # Atualiza o Card de Resumo
         self.lbl_lucro_total.setText(f"R$ {lucro_acumulado:.2f}")
         self.lbl_lucro_total.setStyleSheet(f"color: {'#00e676' if lucro_acumulado >= 0 else '#ff5252'}; font-size: 32px; font-weight: bold;")

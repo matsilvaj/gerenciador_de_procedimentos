@@ -196,3 +196,11 @@ def buscar_dados_mes(mes_ref):
     dados = cursor.fetchall()
     conexao.close()
     return dados
+
+def excluir_casa(nome_casa):
+    """Remove uma casa de aposta do banco de dados."""
+    conexao = conectar()
+    cursor = conexao.cursor()
+    cursor.execute("DELETE FROM Casas_de_Apostas WHERE nome = ?", (nome_casa,))
+    conexao.commit()
+    conexao.close()

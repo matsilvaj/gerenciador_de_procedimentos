@@ -1,6 +1,6 @@
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
                                QGridLayout, QFrame, QTabWidget, QComboBox, QPushButton)
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QEvent
 import pyqtgraph as pg
 from datetime import datetime
 import calendar
@@ -23,7 +23,7 @@ class CardMetrica(QFrame):
 class TelaDashboard(QWidget):
     def __init__(self):
         super().__init__()
-        self.mostrar_valor_freebet = False # Controle do Toggle de Freebet
+        self.mostrar_valor_freebet = False 
 
         layout_principal = QVBoxLayout(self)
         layout_principal.setContentsMargins(20, 20, 20, 20)
@@ -72,7 +72,6 @@ class TelaDashboard(QWidget):
             QTabBar::tab:selected { background: #1a1d2d; color: #00e676; border-bottom: 2px solid #00e676; }
         """)
 
-        # Configuração padrão para todos os gráficos
         def criar_grafico(titulo):
             g = pg.PlotWidget(title=titulo)
             g.setBackground('#1a1d2d')
@@ -81,19 +80,15 @@ class TelaDashboard(QWidget):
             g.getAxis('bottom').setPen('#7b849b')
             return g
 
-        # Aba 1: Evolução (Linha)
         self.grafico_linha = criar_grafico("Evolução do Lucro")
         self.abas_graficos.addTab(self.grafico_linha, "Evolução Mensal")
 
-        # Aba 2: Lucro Diário (Barra)
         self.grafico_barra_lucro = criar_grafico("Lucro por Dia")
         self.abas_graficos.addTab(self.grafico_barra_lucro, "Lucro Diário")
 
-        # Aba 3: Volume de Procedimentos (Barra)
         self.grafico_barra_vol = criar_grafico("Quantidade de Procedimentos por Dia")
         self.abas_graficos.addTab(self.grafico_barra_vol, "Volume Diário")
 
-        # Aba 4: Freebets com Toggle
         aba_freebet = QWidget()
         layout_freebet = QVBoxLayout(aba_freebet)
         layout_freebet.setContentsMargins(0,0,0,0)
@@ -112,10 +107,53 @@ class TelaDashboard(QWidget):
 
         layout_principal.addWidget(self.abas_graficos)
 
+        self.grafico_linha.installEventFilter(self)
+        self.grafico_barra_lucro.installEventFilter(self)
+        self.grafico_barra_vol.installEventFilter(self)
+        self.grafico_barra_freebet.installEventFilter(self)
+
+        # --- 4. Sistema de Tooltips Discretos ---
+        def criar_tooltip():
+            tt = pg.TextItem("", anchor=(0.5, 1.2), color="white", fill=pg.mkBrush(22, 25, 37, 240))
+            tt.setZValue(10)
+            tt.hide()
+            return tt
+
+        self.tt_linha = criar_tooltip()
+        self.tt_lucro = criar_tooltip()
+        self.tt_vol = criar_tooltip()
+        self.tt_freebet = criar_tooltip()
+
+        self.hover_dot = pg.ScatterPlotItem(size=8, pen=pg.mkPen('#00e676', width=2), brush=pg.mkBrush('#1a1d2d'))
+        self.hover_dot.setZValue(9)
+        self.hover_dot.hide()
+
+        self.grafico_linha.scene().sigMouseMoved.connect(self.hover_linha)
+        self.grafico_barra_lucro.scene().sigMouseMoved.connect(self.hover_lucro)
+        self.grafico_barra_vol.scene().sigMouseMoved.connect(self.hover_vol)
+        self.grafico_barra_freebet.scene().sigMouseMoved.connect(self.hover_freebet)
+
+    def eventFilter(self, watched, event):
+        if event.type() == QEvent.Leave:
+            if watched == self.grafico_linha:
+                self.tt_linha.hide()
+                self.hover_dot.hide()
+            elif watched == self.grafico_barra_lucro:
+                self.tt_lucro.hide()
+            elif watched == self.grafico_barra_vol:
+                self.tt_vol.hide()
+            elif watched == self.grafico_barra_freebet:
+                self.tt_freebet.hide()
+        return super().eventFilter(watched, event)
+
     def alternar_modo_freebet(self):
         self.mostrar_valor_freebet = not self.mostrar_valor_freebet
-        texto = "Visualizando: Valor (R$)" if self.mostrar_valor_freebet else "Visualizando: Quantidade"
-        self.btn_toggle_freebet.setText(texto)
+        if self.mostrar_valor_freebet:
+            self.btn_toggle_freebet.setText("Visualizando: Lucro Final (R$)")
+            self.grafico_barra_freebet.setTitle("Lucro de Freebets Convertidas por Dia")
+        else:
+            self.btn_toggle_freebet.setText("Visualizando: Quantidade")
+            self.grafico_barra_freebet.setTitle("Freebets Coletadas por Dia")
         self.atualizar_dados()
 
     def atualizar_dados(self):
@@ -127,54 +165,51 @@ class TelaDashboard(QWidget):
         mes_atual = hoje_obj.strftime("%m/%Y")
         filtro = self.combo_filtro.currentText()
         
-        # Lógica de Filtro
         if filtro == "Todos":
-            cursor.execute("SELECT data_operacao, lucro_final, tipo_procedimento, valor_freebet_coletada FROM Procedimentos_Historico WHERE mes_referencia = ?", (mes_atual,))
+            cursor.execute("SELECT data_operacao, lucro_final, tipo_procedimento, valor_freebet_coletada, bateu_duplo FROM Procedimentos_Historico WHERE mes_referencia = ?", (mes_atual,))
         else:
-            cursor.execute("SELECT data_operacao, lucro_final, tipo_procedimento, valor_freebet_coletada FROM Procedimentos_Historico WHERE mes_referencia = ? AND tipo_procedimento = ?", (mes_atual, filtro))
+            cursor.execute("SELECT data_operacao, lucro_final, tipo_procedimento, valor_freebet_coletada, bateu_duplo FROM Procedimentos_Historico WHERE mes_referencia = ? AND tipo_procedimento = ?", (mes_atual, filtro))
             
         registros = cursor.fetchall()
 
         cursor.execute("SELECT COUNT(*) FROM Procedimentos_Historico WHERE tipo_procedimento = 'Coletar Freebet' AND status_freebet = 'Pendente'")
         total_pendente = cursor.fetchone()[0]
-
         conexao.close()
 
-        # Descobre quantos dias tem o mês atual (Ex: 30 ou 31)
         _, max_dias = calendar.monthrange(hoje_obj.year, hoje_obj.month)
         
-        # Cria listas zeradas do dia 1 até o último dia do mês
-        dias_x = list(range(1, max_dias + 1))
-        lucro_por_dia = {d: 0.0 for d in dias_x}
-        volume_por_dia = {d: 0 for d in dias_x}
-        freebet_qtd_dia = {d: 0 for d in dias_x}
-        freebet_valor_dia = {d: 0.0 for d in dias_x}
+        self.dados_dias = list(range(1, max_dias + 1))
+        lucro_por_dia = {d: 0.0 for d in self.dados_dias}
+        volume_por_dia = {d: 0 for d in self.dados_dias}
+        freebet_qtd_dia = {d: 0 for d in self.dados_dias}
+        freebet_lucro_dia = {d: 0.0 for d in self.dados_dias}
 
         lucro_mensal = 0.0
         lucro_hoje = 0.0
         proc_hoje = 0
-        freebets_abertas = 0 # Placeholder até termos status de uso
 
-        # Processa os dados do banco
-        for data_op, lucro, tipo, valor_freebet in registros:
-            if lucro is None: lucro = 0.0
+        for data_op, lucro_base, tipo, valor_freebet, bateu in registros:
+            if lucro_base is None: lucro_base = 0.0
             if valor_freebet is None: valor_freebet = 0.0
             
-            dia_inteiro = int(data_op.split('/')[0]) # Pega o "19" de "19/04/2026"
+            dia_inteiro = int(data_op.split('/')[0])
             
-            lucro_mensal += lucro
-            lucro_por_dia[dia_inteiro] += lucro
+            lucro_real = lucro_base + (valor_freebet if bateu else 0.0)
+            
+            lucro_mensal += lucro_real
+            lucro_por_dia[dia_inteiro] += lucro_real
             volume_por_dia[dia_inteiro] += 1
             
             if tipo == "Coletar Freebet":
                 freebet_qtd_dia[dia_inteiro] += 1
-                freebet_valor_dia[dia_inteiro] += valor_freebet
+            
+            if tipo == "Converter Freebet":
+                freebet_lucro_dia[dia_inteiro] += lucro_real 
 
             if data_op == hoje_str:
-                lucro_hoje += lucro
+                lucro_hoje += lucro_real
                 proc_hoje += 1
 
-        # Atualiza Cards
         self.card_lucro_diario.lbl_valor.setText(f"R$ {lucro_hoje:.2f}")
         self.card_lucro_diario.lbl_valor.setStyleSheet(f"color: {'#00e676' if lucro_hoje >= 0 else '#ff5252'}; font-size: 26px; font-weight: bold;")
         self.card_lucro_mensal.lbl_valor.setText(f"R$ {lucro_mensal:.2f}")
@@ -184,44 +219,162 @@ class TelaDashboard(QWidget):
         self.card_proc_hoje.lbl_valor.setText(str(proc_hoje))
         self.card_freebets.lbl_valor.setText(str(total_pendente))
 
-        # --- Limpa e Desenha os Gráficos ---
+        acumulado = 0
+        self.dados_linha_y = []
+        for d in self.dados_dias:
+            acumulado += lucro_por_dia[d]
+            self.dados_linha_y.append(acumulado)
+            
+        self.dados_lucro_y = [lucro_por_dia[d] for d in self.dados_dias]
+        self.dados_vol_y = [volume_por_dia[d] for d in self.dados_dias]
+        self.dados_freebet_qtd = [freebet_qtd_dia[d] for d in self.dados_dias]
+        self.dados_freebet_lucro = [freebet_lucro_dia[d] for d in self.dados_dias]
+
         self.grafico_linha.clear()
         self.grafico_barra_lucro.clear()
         self.grafico_barra_vol.clear()
         self.grafico_barra_freebet.clear()
 
-        # Acumulado Mensal (Linha)
-        acumulado = 0
-        lucro_acumulado_y = []
-        for d in dias_x:
-            acumulado += lucro_por_dia[d]
-            lucro_acumulado_y.append(acumulado)
-            
         pen_linha = pg.mkPen(color='#00e676', width=3)
-        self.grafico_linha.plot(dias_x, lucro_acumulado_y, pen=pen_linha, symbol='o', symbolBrush='#1a1d2d', symbolPen='#00e676')
+        self.grafico_linha.plot(self.dados_dias, self.dados_linha_y, pen=pen_linha)
 
-        # Lucro Diário (Barra)
-        cores_lucro = ['#00e676' if lucro_por_dia[d] >= 0 else '#ff5252' for d in dias_x]
-        bg_lucro = pg.BarGraphItem(x=dias_x, height=[lucro_por_dia[d] for d in dias_x], width=0.6, brushes=cores_lucro)
+        cores_lucro = ['#00e676' if l >= 0 else '#ff5252' for l in self.dados_lucro_y]
+        bg_lucro = pg.BarGraphItem(x=self.dados_dias, height=self.dados_lucro_y, width=0.6, brushes=cores_lucro)
         self.grafico_barra_lucro.addItem(bg_lucro)
 
-        # Volume (Barra)
-        bg_vol = pg.BarGraphItem(x=dias_x, height=[volume_por_dia[d] for d in dias_x], width=0.6, brush='#00bcd4')
+        bg_vol = pg.BarGraphItem(x=self.dados_dias, height=self.dados_vol_y, width=0.6, brush='#00bcd4')
         self.grafico_barra_vol.addItem(bg_vol)
 
-        # Freebet Toggle (Barra)
         if self.mostrar_valor_freebet:
-            dados_freebet = [freebet_valor_dia[d] for d in dias_x]
-            cor_fb = '#ffb300'
+            cores_fb = ['#00e676' if l >= 0 else '#ff5252' for l in self.dados_freebet_lucro]
+            bg_freebet = pg.BarGraphItem(x=self.dados_dias, height=self.dados_freebet_lucro, width=0.6, brushes=cores_fb)
         else:
-            dados_freebet = [freebet_qtd_dia[d] for d in dias_x]
-            cor_fb = '#ffb300'
-            
-        bg_freebet = pg.BarGraphItem(x=dias_x, height=dados_freebet, width=0.6, brush=cor_fb)
+            bg_freebet = pg.BarGraphItem(x=self.dados_dias, height=self.dados_freebet_qtd, width=0.6, brush='#ffb300')
         self.grafico_barra_freebet.addItem(bg_freebet)
 
-        # Fixa o Eixo X para mostrar os dias certinhos (1, 2, 3...)
-        for grafico in [self.grafico_linha, self.grafico_barra_lucro, self.grafico_barra_vol, self.grafico_barra_freebet]:
+        for grafico, tt in [(self.grafico_linha, self.tt_linha), (self.grafico_barra_lucro, self.tt_lucro), 
+                            (self.grafico_barra_vol, self.tt_vol), (self.grafico_barra_freebet, self.tt_freebet)]:
             grafico.setXRange(0.5, max_dias + 0.5, padding=0)
-            grafico.getAxis('bottom').setTicks([[(d, str(d)) for d in dias_x]])
+            grafico.getAxis('bottom').setTicks([[(d, str(d)) for d in self.dados_dias]])
+            grafico.addItem(tt)
+
+        self.grafico_linha.addItem(self.hover_dot)
+
+        # --- A MÁGICA PARA NÃO CORTAR O TEXTO NO TOPO ---
+        def aplicar_margem_y(grafico, dados, aceita_negativo=True):
+            if not dados: return
+            v_min, v_max = min(dados), max(dados)
+            margem = (v_max - v_min) * 0.15 if v_max != v_min else (abs(v_max) * 0.2 if v_max else 10)
+            y_topo = v_max + margem
+            y_base = (v_min - margem) if aceita_negativo and v_min < 0 else 0
+            grafico.setYRange(y_base, y_topo)
+
+        aplicar_margem_y(self.grafico_linha, self.dados_linha_y)
+        aplicar_margem_y(self.grafico_barra_lucro, self.dados_lucro_y)
+        aplicar_margem_y(self.grafico_barra_vol, self.dados_vol_y, aceita_negativo=False)
+        dados_fb = self.dados_freebet_lucro if self.mostrar_valor_freebet else self.dados_freebet_qtd
+        aplicar_margem_y(self.grafico_barra_freebet, dados_fb, aceita_negativo=self.mostrar_valor_freebet)
+
+    # --- LÓGICA DE HOVER INTELIGENTE ---
+    def hover_linha(self, pos):
+        if not hasattr(self, 'dados_dias') or not self.grafico_linha.sceneBoundingRect().contains(pos):
+            self.hover_dot.hide()
+            self.tt_linha.hide()
+            return
             
+        mousePoint = self.grafico_linha.plotItem.vb.mapSceneToView(pos)
+        x = int(round(mousePoint.x()))
+        
+        if 1 <= x <= len(self.dados_dias):
+            y = self.dados_linha_y[x - 1]
+            self.hover_dot.setData([x], [y])
+            self.hover_dot.show()
+            self.tt_linha.setText(f"R$ {y:.2f}")
+            self.tt_linha.setAnchor((0.5, 1.2) if y >= 0 else (0.5, -0.2)) 
+            self.tt_linha.setPos(x, y)
+            self.tt_linha.show()
+        else:
+            self.hover_dot.hide()
+            self.tt_linha.hide()
+
+    def hover_lucro(self, pos):
+        if not hasattr(self, 'dados_dias') or not self.grafico_barra_lucro.sceneBoundingRect().contains(pos):
+            self.tt_lucro.hide()
+            return
+        mousePoint = self.grafico_barra_lucro.plotItem.vb.mapSceneToView(pos)
+        x = int(round(mousePoint.x()))
+        mouse_y = mousePoint.y()
+        
+        if 1 <= x <= len(self.dados_dias):
+            y = self.dados_lucro_y[x - 1]
+            is_x_hover = abs(mousePoint.x() - x) <= 0.3 
+            is_y_hover = (y >= 0 and 0 <= mouse_y <= y) or (y < 0 and y <= mouse_y <= 0)
+            
+            if is_x_hover and is_y_hover:
+                self.tt_lucro.setText(f"R$ {y:.2f}")
+                self.tt_lucro.setAnchor((0.5, 1.2) if y >= 0 else (0.5, -0.2))
+                self.tt_lucro.setPos(x, y)
+                self.tt_lucro.show()
+            else:
+                self.tt_lucro.hide()
+        else:
+            self.tt_lucro.hide()
+
+    def hover_vol(self, pos):
+        if not hasattr(self, 'dados_dias') or not self.grafico_barra_vol.sceneBoundingRect().contains(pos):
+            self.tt_vol.hide()
+            return
+        mousePoint = self.grafico_barra_vol.plotItem.vb.mapSceneToView(pos)
+        x = int(round(mousePoint.x()))
+        mouse_y = mousePoint.y()
+        
+        if 1 <= x <= len(self.dados_dias):
+            y = self.dados_vol_y[x - 1]
+            is_x_hover = abs(mousePoint.x() - x) <= 0.3
+            is_y_hover = 0 <= mouse_y <= y
+            
+            if is_x_hover and is_y_hover:
+                self.tt_vol.setText(f"{y}")
+                self.tt_vol.setAnchor((0.5, 1.2))
+                self.tt_vol.setPos(x, y)
+                self.tt_vol.show()
+            else:
+                self.tt_vol.hide()
+        else:
+            self.tt_vol.hide()
+
+    def hover_freebet(self, pos):
+        if not hasattr(self, 'dados_dias') or not self.grafico_barra_freebet.sceneBoundingRect().contains(pos):
+            self.tt_freebet.hide()
+            return
+        mousePoint = self.grafico_barra_freebet.plotItem.vb.mapSceneToView(pos)
+        x = int(round(mousePoint.x()))
+        mouse_y = mousePoint.y()
+        
+        if 1 <= x <= len(self.dados_dias):
+            is_x_hover = abs(mousePoint.x() - x) <= 0.3
+            
+            if self.mostrar_valor_freebet:
+                y = self.dados_freebet_lucro[x - 1]
+                is_y_hover = (y >= 0 and 0 <= mouse_y <= y) or (y < 0 and y <= mouse_y <= 0)
+                
+                if is_x_hover and is_y_hover:
+                    self.tt_freebet.setText(f"R$ {y:.2f}")
+                    self.tt_freebet.setAnchor((0.5, 1.2) if y >= 0 else (0.5, -0.2))
+                    self.tt_freebet.setPos(x, y)
+                    self.tt_freebet.show()
+                else:
+                    self.tt_freebet.hide()
+            else:
+                y = self.dados_freebet_qtd[x - 1]
+                is_y_hover = 0 <= mouse_y <= y
+                
+                if is_x_hover and is_y_hover:
+                    self.tt_freebet.setText(f"{y}")
+                    self.tt_freebet.setAnchor((0.5, 1.2))
+                    self.tt_freebet.setPos(x, y)
+                    self.tt_freebet.show()
+                else:
+                    self.tt_freebet.hide()
+        else:
+            self.tt_freebet.hide()
