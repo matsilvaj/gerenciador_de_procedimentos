@@ -78,6 +78,11 @@ class TelaDashboard(QWidget):
             g.showGrid(x=False, y=True, alpha=0.2)
             g.getAxis('left').setPen('#7b849b')
             g.getAxis('bottom').setPen('#7b849b')
+            
+            g.setMouseEnabled(x=False, y=False)
+            g.setMenuEnabled(False)             
+            g.hideButtons()                   
+            
             return g
 
         self.grafico_linha = criar_grafico("Evolução do Lucro")
