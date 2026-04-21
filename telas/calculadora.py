@@ -12,9 +12,11 @@ class TelaCalculadora(QWidget):
         super().__init__()
         self.lucro_global_atual = 0.0
         self.media_retornos_atual = 0.0
-        self.last_edited_index = 0 # Guarda qual linha o usuário editou por último
+        self.last_edited_index = 0
         
-        # Layout Principal com Scroll
+        self.casa_fb_pendente = None
+        self.ids_fb_pendente = None
+        
         self.main_layout = QVBoxLayout(self)
         self.main_layout.setContentsMargins(0, 0, 0, 0)
 
@@ -32,7 +34,6 @@ class TelaCalculadora(QWidget):
         titulo.setStyleSheet("font-size: 24px; font-weight: bold; color: #f4f4f5;")
         self.layout_container.addWidget(titulo)
 
-        # Estilo comum 
         self.estilo_geral = """
             QGroupBox { 
                 border: 1px solid rgba(255,255,255,0.05); 
@@ -67,14 +68,20 @@ class TelaCalculadora(QWidget):
 
         self.linhas_sure = []
         
-        # --- SEÇÃO SUREBET ---
         self.setup_secao_surebet()
-        
-        # --- SEÇÃO MÉDIA PONDERADA ---
         self.setup_secao_media()
 
         self.scroll.setWidget(self.container)
         self.main_layout.addWidget(self.scroll)
+
+    def preencher_dados_freebet(self, casa, valor, ids_origem):
+        self.casa_fb_pendente = casa
+        self.ids_fb_pendente = ids_origem
+        
+        if self.linhas_sure:
+            self.linhas_sure[0]["stake"].setText(f"{valor:.2f}")
+            self.linhas_sure[0]["chk_fb"].setChecked(True)
+            self.calcular_surebet()
 
     def setup_secao_surebet(self):
         grupo_sure = QGroupBox("Calculadora de Arbitragem Avançada")
@@ -82,9 +89,7 @@ class TelaCalculadora(QWidget):
         lay_sure = QVBoxLayout(grupo_sure)
         lay_sure.setSpacing(15)
 
-        # Seletores de Tipo e Quantidade
         lay_seletores = QHBoxLayout()
-        
         vbox_tipo = QVBoxLayout()
         vbox_tipo.addWidget(QLabel("Modelo de Cálculo:"))
         self.combo_modelo = QComboBox()
@@ -106,14 +111,12 @@ class TelaCalculadora(QWidget):
         lay_seletores.addStretch()
         lay_sure.addLayout(lay_seletores)
 
-        # Container Principal das Linhas
         self.container_linhas_sure = QWidget()
         self.layout_linhas = QVBoxLayout(self.container_linhas_sure)
         self.layout_linhas.setContentsMargins(0, 10, 0, 10)
         self.layout_linhas.setSpacing(10)
         lay_sure.addWidget(self.container_linhas_sure)
 
-        # Resultados globais (Rodapé)
         self.frame_res = QFrame()
         self.frame_res.setStyleSheet("background-color: #18181b; border-radius: 8px; padding: 15px;")
         lay_res = QHBoxLayout(self.frame_res)
@@ -128,10 +131,13 @@ class TelaCalculadora(QWidget):
         lay_res.addWidget(self.lbl_lucro_sure)
         lay_sure.addWidget(self.frame_res)
 
-        # Ações (Checkbox Duplo e Botão)
         lay_acoes = QHBoxLayout()
         self.check_duplo = QCheckBox("Possibilidade de Duplo Green (Média dos Retornos)")
         self.check_duplo.setStyleSheet("color: #a1a1aa; font-weight: bold; font-size: 13px;")
+        
+        self.btn_limpar = QPushButton("Limpar")
+        self.btn_limpar.setStyleSheet("background-color: transparent; color: #f87171; font-weight: bold; padding: 10px 20px; border: 1px solid #f87171; border-radius: 8px;")
+        self.btn_limpar.clicked.connect(self.limpar_calculadora)
         
         self.btn_criar_proc = QPushButton("Criar Procedimento")
         self.btn_criar_proc.setStyleSheet("background-color: #3b82f6; color: white; font-weight: bold; padding: 10px 20px; border-radius: 8px;")
@@ -139,6 +145,7 @@ class TelaCalculadora(QWidget):
         
         lay_acoes.addWidget(self.check_duplo)
         lay_acoes.addStretch()
+        lay_acoes.addWidget(self.btn_limpar)
         lay_acoes.addWidget(self.btn_criar_proc)
         
         lay_sure.addLayout(lay_acoes)
@@ -146,8 +153,19 @@ class TelaCalculadora(QWidget):
         self.atualizar_linhas_surebet()
         self.layout_container.addWidget(grupo_sure)
 
+    def atualizar_indicador_adv(self, idx):
+        """Muda o estilo do botão ▼ se houver opções avançadas ativas na linha"""
+        l = self.linhas_sure[idx]
+        tem_algo = bool(l["inp_aum"].text().strip() or l["inp_com"].text().strip() or l["inp_cash"].text().strip() or l["chk_fb"].isChecked())
+        sinal = "▲" if l["container_adv"].isVisible() else "▼"
+        
+        l["btn_adv"].setText(f"{sinal} *" if tem_algo else sinal)
+        if tem_algo:
+            l["btn_adv"].setStyleSheet("background-color: rgba(59, 130, 246, 0.1); color: #3b82f6; font-size: 12px; border: 1px solid #3b82f6; border-radius: 6px; font-weight: bold;")
+        else:
+            l["btn_adv"].setStyleSheet("background-color: transparent; color: #a1a1aa; font-size: 12px; border: 1px solid rgba(255,255,255,0.1); border-radius: 6px;")
+
     def atualizar_linhas_surebet(self):
-        # Salvar os estados
         estados = []
         for l in self.linhas_sure:
             estados.append({
@@ -156,7 +174,6 @@ class TelaCalculadora(QWidget):
                 "cash": l["inp_cash"].text(), "freebet": l["chk_fb"].isChecked(), "adv_vis": l["container_adv"].isVisible()
             })
 
-        # Limpar layout
         for i in reversed(range(self.layout_linhas.count())): 
             w = self.layout_linhas.itemAt(i).widget()
             if w: w.deleteLater()
@@ -164,7 +181,6 @@ class TelaCalculadora(QWidget):
 
         qtd = int(self.combo_qtd.currentText())
         
-        # Cabeçalho com proporções e alinhamentos para preencher o espaço
         header = QWidget()
         h_lay = QHBoxLayout(header)
         h_lay.setContentsMargins(0, 0, 0, 0)
@@ -176,15 +192,15 @@ class TelaCalculadora(QWidget):
         lbl_h4.setFixedWidth(40)
         lbl_h4.setAlignment(Qt.AlignCenter)
         lbl_h5 = QLabel("")
-        lbl_h5.setFixedWidth(30)
+        lbl_h5.setFixedWidth(35)
         lbl_h6 = QLabel("Lucro Líquido")
         lbl_h6.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
         
-        h_lay.addWidget(lbl_h1, 2) # Proporção 2
-        h_lay.addWidget(lbl_h2, 4) # Proporção 4
-        h_lay.addWidget(lbl_h4, 0) # Fixo
-        h_lay.addWidget(lbl_h5, 0) # Fixo
-        h_lay.addWidget(lbl_h6, 3) # Proporção 3 (Alinhado à direita)
+        h_lay.addWidget(lbl_h1, 2)
+        h_lay.addWidget(lbl_h2, 4)
+        h_lay.addWidget(lbl_h4, 0)
+        h_lay.addWidget(lbl_h5, 0)
+        h_lay.addWidget(lbl_h6, 3)
         self.layout_linhas.addWidget(header)
 
         for i in range(qtd):
@@ -193,7 +209,6 @@ class TelaCalculadora(QWidget):
             row_layout.setContentsMargins(0, 0, 0, 5)
             row_layout.setSpacing(5)
 
-            # --- LINHA PRINCIPAL ---
             main_row = QWidget()
             m_lay = QHBoxLayout(main_row)
             m_lay.setContentsMargins(0, 0, 0, 0)
@@ -201,7 +216,6 @@ class TelaCalculadora(QWidget):
             
             inp_odd = QLineEdit(); inp_odd.setPlaceholderText("Odd")
             
-            # Contentor expansível para a Stake e o Risco
             container_stake = QWidget()
             lay_stake = QHBoxLayout(container_stake)
             lay_stake.setContentsMargins(0, 0, 0, 0)
@@ -210,8 +224,6 @@ class TelaCalculadora(QWidget):
             inp_stake = QLineEdit()
             inp_resp = QLineEdit(); inp_resp.setPlaceholderText("Risco (Lay)")
             inp_resp.setStyleSheet("color: #ec4899; font-weight: bold; background-color: rgba(236, 72, 153, 0.05); border: 1px solid rgba(236, 72, 153, 0.2);")
-            
-            # O Risco fica escondido por defeito (Só aparece no Lay)
             inp_resp.hide()
             
             lay_stake.addWidget(inp_stake, 1)
@@ -225,7 +237,6 @@ class TelaCalculadora(QWidget):
                 inp_stake.setPlaceholderText("Sua Stake")
             else:
                 inp_stake.setPlaceholderText("Stake Auto")
-                # Sem ReadOnly para permitir edição em qualquer linha!
 
             btn_tipo = QPushButton("B")
             btn_tipo.setFixedSize(40, 40)
@@ -233,23 +244,20 @@ class TelaCalculadora(QWidget):
             btn_tipo.setCursor(Qt.PointingHandCursor)
             
             btn_adv = QPushButton("▼")
-            btn_adv.setFixedSize(30, 40)
+            btn_adv.setFixedSize(35, 40)
             btn_adv.setStyleSheet("background-color: transparent; color: #a1a1aa; font-size: 12px; border: 1px solid rgba(255,255,255,0.1); border-radius: 6px;")
             btn_adv.setCursor(Qt.PointingHandCursor)
 
-            # O Lucro Líquido agora tem um fundo estilo "bloco" e preenche o espaço
             lbl_lucro = QLabel("R$ 0.00")
             lbl_lucro.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
             lbl_lucro.setStyleSheet("color: #a1a1aa; font-weight: bold; background-color: #18181b; border-radius: 6px; padding: 8px 15px; font-size: 15px;")
             
-            # Adiciona com as mesmas proporções do cabeçalho
             m_lay.addWidget(inp_odd, 2)
             m_lay.addWidget(container_stake, 4)
             m_lay.addWidget(btn_tipo, 0)
             m_lay.addWidget(btn_adv, 0)
             m_lay.addWidget(lbl_lucro, 3)
 
-            # --- LINHA AVANÇADA (Oculta e Centralizada) ---
             adv_row = QWidget()
             a_lay = QHBoxLayout(adv_row)
             a_lay.setContentsMargins(10, 10, 10, 10)
@@ -261,7 +269,6 @@ class TelaCalculadora(QWidget):
             chk_fb = QCheckBox("Freebet (Só Lucro)")
             chk_fb.setStyleSheet("color: #f4f4f5; font-weight: bold; margin-left: 10px;")
 
-            # addStretch centra perfeitamente o conteúdo
             a_lay.addStretch()
             a_lay.addWidget(lbl_aum); a_lay.addWidget(inp_aum); a_lay.addSpacing(15)
             a_lay.addWidget(lbl_com); a_lay.addWidget(inp_com); a_lay.addSpacing(15)
@@ -281,31 +288,29 @@ class TelaCalculadora(QWidget):
                 "inp_aum": inp_aum, "inp_com": inp_com, "inp_cash": inp_cash, "chk_fb": chk_fb
             })
             
-            # Conexões Visuais
             def toggle_tipo(checked=False, idx=i):
                 b = self.linhas_sure[idx]["btn_tipo"]
                 resp = self.linhas_sure[idx]["inp_resp"]
                 if b.text() == "B":
                     b.setText("L")
                     b.setStyleSheet("background-color: #ec4899; color: white; border-radius: 6px; font-weight: bold; font-size: 16px;")
-                    resp.show() # Mostra o Risco
+                    resp.show()
                 else:
                     b.setText("B")
                     b.setStyleSheet("background-color: #3b82f6; color: white; border-radius: 6px; font-weight: bold; font-size: 16px;")
-                    resp.hide() # Esconde o Risco
+                    resp.hide()
                 self.sincronizar_campos(idx, "odd")
                 self.calcular_surebet()
 
             def toggle_adv(checked=False, idx=i):
                 c = self.linhas_sure[idx]["container_adv"]
-                b = self.linhas_sure[idx]["btn_adv"]
-                if c.isVisible(): c.hide(); b.setText("▼")
-                else: c.show(); b.setText("▲")
+                if c.isVisible(): c.hide()
+                else: c.show()
+                self.atualizar_indicador_adv(idx)
 
             btn_tipo.clicked.connect(lambda chk=False, idx=i: toggle_tipo(chk, idx))
             btn_adv.clicked.connect(lambda chk=False, idx=i: toggle_adv(chk, idx))
             
-            # Restaurar estado
             if i < len(estados):
                 e = estados[i]
                 inp_odd.setText(e["odd"]); inp_stake.setText(e["stake"]); inp_resp.setText(e["resp"])
@@ -314,21 +319,55 @@ class TelaCalculadora(QWidget):
                 if e["tipo"] == "L":
                     btn_tipo.setText("L"); btn_tipo.setStyleSheet("background-color: #ec4899; color: white; border-radius: 6px; font-weight: bold; font-size: 16px;")
                     inp_resp.show()
-                if e["adv_vis"]: adv_row.show(); btn_adv.setText("▲")
+                if e["adv_vis"]: adv_row.show()
 
-            # Tracking de Edição para QUALQUER LINHA
             inp_odd.textEdited.connect(lambda txt, idx=i: self.on_text_edited(idx, "odd"))
             inp_stake.textEdited.connect(lambda txt, idx=i: self.on_text_edited(idx, "stake"))
             inp_resp.textEdited.connect(lambda txt, idx=i: self.on_text_edited(idx, "resp"))
             
-            for inp in [inp_aum, inp_com, inp_cash]: inp.textChanged.connect(self.calcular_surebet)
+            for inp in [inp_aum, inp_com, inp_cash]: 
+                inp.textChanged.connect(self.calcular_surebet)
+                inp.textChanged.connect(lambda txt, idx=i: self.atualizar_indicador_adv(idx))
+            
             chk_fb.stateChanged.connect(self.calcular_surebet)
+            chk_fb.stateChanged.connect(lambda state, idx=i: self.atualizar_indicador_adv(idx))
+            
+            self.atualizar_indicador_adv(i)
 
         self.calcular_surebet()
 
-    # --- MOTOR MATEMÁTICO ---
+    def limpar_calculadora(self):
+        self.combo_modelo.setCurrentIndex(0)
+        self.check_duplo.setChecked(False)
+        self.casa_fb_pendente = None
+        self.ids_fb_pendente = None
+        
+        for idx, l in enumerate(self.linhas_sure):
+            l["odd"].setText("")
+            l["stake"].setText("")
+            l["inp_resp"].setText("")
+            l["inp_aum"].setText("")
+            l["inp_com"].setText("")
+            l["inp_cash"].setText("")
+            l["chk_fb"].setChecked(False)
+            if l["btn_tipo"].text() == "L":
+                l["btn_tipo"].setText("B")
+                l["btn_tipo"].setStyleSheet("background-color: #3b82f6; color: white; border-radius: 6px; font-weight: bold; font-size: 16px;")
+                l["inp_resp"].hide()
+            self.atualizar_indicador_adv(idx)
+                
+        self.combo_qtd.blockSignals(True)
+        self.combo_qtd.setCurrentIndex(0)
+        self.combo_qtd.blockSignals(False)
+        
+        self.atualizar_linhas_surebet()
+        
+        for v_inp, o_inp in self.linhas_media:
+            v_inp.setText("")
+            o_inp.setText("")
+        self.calcular_media()
+
     def on_text_edited(self, idx, source):
-        # Atualiza o index da aposta base sempre que digitar numa Stake ou Risco
         if source in ["stake", "resp"]: self.last_edited_index = idx
         self.sincronizar_campos(idx, source)
         self.calcular_surebet()
@@ -438,7 +477,6 @@ class TelaCalculadora(QWidget):
                 if i == b_idx:
                     s_final = s_base
                 else:
-                    # Se for Lay permite casas decimais. Se for Back arredonda a Stake.
                     if c["is_lay"]: s_final = round(stakes[i], 2)
                     else: s_final = float(int(round(stakes[i])))
                 
@@ -501,17 +539,26 @@ class TelaCalculadora(QWidget):
             media_retornos = getattr(self, 'media_retornos_atual', 0.0)
             is_duplo = self.check_duplo.isChecked()
             
+            tipo = "Converter Freebet" if self.casa_fb_pendente else ('Tentativa de Duplo' if is_duplo else 'SureBet')
+            casa_sugerida = self.casa_fb_pendente if self.casa_fb_pendente else 'Nenhuma selecionada'
+            
             d = {
-                'tipo': 'Tentativa de Duplo' if is_duplo else 'SureBet',
-                'jogo': '', 'casas': 'Nenhuma selecionada',
+                'tipo': tipo,
+                'jogo': '', 'casas': casa_sugerida,
                 'lucro_base': round(lucro_base, 2),
                 'v_duplo': round(media_retornos, 2) if is_duplo else 0.0,
-                'obs': '', 'condicao': '', 'casa_fb': ''
+                'obs': '', 'condicao': '', 'casa_fb': self.casa_fb_pendente if self.casa_fb_pendente else ''
             }
             
             dialog = DialogNovoProcedimento(self, dados_edicao=d)
             if dialog.exec() == QDialog.Accepted:
-                database.salvar_procedimento(dialog.dados_finais)
+                if self.ids_fb_pendente:
+                    database.salvar_conversao_freebet(dialog.dados_finais, self.ids_fb_pendente)
+                    self.casa_fb_pendente = None
+                    self.ids_fb_pendente = None
+                else:
+                    database.salvar_procedimento(dialog.dados_finais)
+                    
                 QMessageBox.information(self, "Sucesso", "Procedimento salvo com sucesso!\nEle já aparecerá na aba de Procedimentos.")
         except Exception:
             QMessageBox.warning(self, "Erro", "Houve um problema ao criar o procedimento. Verifique os valores.")

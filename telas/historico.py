@@ -89,7 +89,7 @@ class TelaHistorico(QWidget):
             lucro_acumulado += l_final
             
             def item(t, cor=None):
-                it = QTableWidgetItem(str(t) if t not in ["None", None, ""] else "---")
+                it = QTableWidgetItem(str(t) if t not in ["None", None, ""] else "-")
                 it.setTextAlignment(Qt.AlignCenter)
                 if cor: it.setForeground(QBrush(QColor(cor)))
                 return it

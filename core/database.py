@@ -1,19 +1,15 @@
 import sqlite3
 import os
 
-# Define o nome do arquivo do banco de dados
 DB_NAME = "dados_usuario.db"
 
 def conectar():
-    """Retorna uma conexão com o banco de dados SQLite."""
     return sqlite3.connect(DB_NAME)
 
 def criar_tabelas():
-    """Cria as tabelas no banco de dados se elas não existirem."""
     conexao = conectar()
     cursor = conexao.cursor()
 
-    # Tabela 1: Casas de Apostas (Para salvar o menu dropdown)
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS Casas_de_Apostas (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -21,7 +17,6 @@ def criar_tabelas():
     )
     """)
 
-    # Tabela 2: Histórico Geral de Procedimentos
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS Procedimentos_Historico (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -38,16 +33,13 @@ def criar_tabelas():
     )
     """)
 
-    # Salva as alterações e fecha a conexão
     conexao.commit()
     conexao.close()
 
 def atualizar_schema():
-    """Adiciona colunas novas em bancos já existentes sem apagar dados."""
     conexao = conectar()
     cursor = conexao.cursor()
     
-    # Atualiza tabela de Histórico
     cursor.execute("PRAGMA table_info(Procedimentos_Historico)")
     colunas = [col[1] for col in cursor.fetchall()]
     if 'casa_destino_freebet' not in colunas:
@@ -56,8 +48,9 @@ def atualizar_schema():
         cursor.execute("ALTER TABLE Procedimentos_Historico ADD COLUMN status_freebet TEXT DEFAULT 'Pendente'")
     if 'id_freebet_origem' not in colunas:
         cursor.execute("ALTER TABLE Procedimentos_Historico ADD COLUMN id_freebet_origem INTEGER")
+    if 'valor_da_freebet' not in colunas:
+        cursor.execute("ALTER TABLE Procedimentos_Historico ADD COLUMN valor_da_freebet REAL DEFAULT 0.0")
         
-    # Atualiza tabela de Casas de Apostas (NOVO PARA O CONTROLE DE SALDO)
     cursor.execute("PRAGMA table_info(Casas_de_Apostas)")
     colunas_casas = [col[1] for col in cursor.fetchall()]
     if 'saldo' not in colunas_casas:
@@ -66,51 +59,51 @@ def atualizar_schema():
     conexao.commit()
     conexao.close()
 
-def salvar_conversao_freebet(dados, id_freebet_origem):
-    """Salva a conversão e muda o status da coleta original para 'Usada'."""
+def salvar_conversao_freebet(dados, ids_freebet_origem):
     conexao = conectar()
     cursor = conexao.cursor()
     
-    # 1. Insere o NOVO procedimento (A Conversão) ligando ao ID original
+    id_referencia = ids_freebet_origem[0] if isinstance(ids_freebet_origem, list) else ids_freebet_origem
+    
     query = """
     INSERT INTO Procedimentos_Historico 
-    (data_operacao, tipo_procedimento, casas_envolvidas, jogo_time_pa, lucro_final, valor_freebet_coletada, condicao_freebet, observacao, mes_referencia, id_freebet_origem)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    (data_operacao, tipo_procedimento, casas_envolvidas, jogo_time_pa, lucro_final, valor_freebet_coletada, condicao_freebet, observacao, mes_referencia, id_freebet_origem, casa_destino_freebet, valor_da_freebet)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """
     valores = (
         dados.get('data_operacao', ''), dados.get('tipo_procedimento', ''), dados.get('casas_envolvidas', ''),
         dados.get('jogo_time_pa', ''), dados.get('lucro_final', 0.0), dados.get('valor_freebet_coletada', 0.0),
         dados.get('condicao_freebet', ''), dados.get('observacao', ''), dados.get('mes_referencia', ''),
-        id_freebet_origem
+        id_referencia, dados.get('casa_destino_freebet', ''), dados.get('valor_da_freebet', 0.0)
     )
     cursor.execute(query, valores)
     
-    # 2. Atualiza a Coleta original para 'Usada'
-    cursor.execute("UPDATE Procedimentos_Historico SET status_freebet = 'Usada' WHERE id = ?", (id_freebet_origem,))
+    if isinstance(ids_freebet_origem, list):
+        for id_op in ids_freebet_origem:
+            cursor.execute("UPDATE Procedimentos_Historico SET status_freebet = 'Usada' WHERE id = ?", (id_op,))
+    else:
+        cursor.execute("UPDATE Procedimentos_Historico SET status_freebet = 'Usada' WHERE id = ?", (ids_freebet_origem,))
     
     conexao.commit()
     conexao.close()
 
-# Bloco de teste para rodar apenas este arquivo e gerar o banco
 if __name__ == "__main__":
     criar_tabelas()
     atualizar_schema()
     print(f"Banco de dados '{DB_NAME}' criado/verificado com sucesso!")
     
 def adicionar_casa(nome_casa):
-    """Adiciona uma nova casa de aposta ao banco, se não existir."""
     conexao = conectar()
     cursor = conexao.cursor()
     try:
         cursor.execute("INSERT INTO Casas_de_Apostas (nome) VALUES (?)", (nome_casa,))
         conexao.commit()
     except sqlite3.IntegrityError:
-        pass # Ignora se a casa já estiver cadastrada (UNIQUE)
+        pass 
     finally:
         conexao.close()
 
 def listar_casas():
-    """Retorna uma lista com os nomes de todas as casas cadastradas."""
     conexao = conectar()
     cursor = conexao.cursor()
     cursor.execute("SELECT nome FROM Casas_de_Apostas ORDER BY nome ASC")
@@ -119,39 +112,27 @@ def listar_casas():
     return casas
 
 def salvar_procedimento(dados):
-    """
-    Recebe um dicionário com os dados da operação e salva no banco de dados.
-    """
     conexao = conectar()
     cursor = conexao.cursor()
-    
     query = """
     INSERT INTO Procedimentos_Historico (
         data_operacao, tipo_procedimento, casas_envolvidas, jogo_time_pa,
         lucro_final, bateu_duplo, condicao_freebet, valor_freebet_coletada, 
-        observacao, mes_referencia
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        observacao, mes_referencia, casa_destino_freebet, status_freebet, valor_da_freebet
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """
-    
     valores = (
-        dados.get('data_operacao'),
-        dados.get('tipo_procedimento'),
-        dados.get('casas_envolvidas'),
-        dados.get('jogo_time_pa'),
-        dados.get('lucro_final'),
-        dados.get('bateu_duplo'),
-        dados.get('condicao_freebet'),
-        dados.get('valor_freebet_coletada'),
-        dados.get('observacao'),
-        dados.get('mes_referencia')
+        dados.get('data_operacao'), dados.get('tipo_procedimento'), dados.get('casas_envolvidas'),
+        dados.get('jogo_time_pa'), dados.get('lucro_final'), dados.get('bateu_duplo'),
+        dados.get('condicao_freebet'), dados.get('valor_freebet_coletada'), dados.get('observacao'),
+        dados.get('mes_referencia'), dados.get('casa_destino_freebet', ''), dados.get('status_freebet', 'N/A'),
+        dados.get('valor_da_freebet', 0.0)
     )
-    
     cursor.execute(query, valores)
     conexao.commit()
     conexao.close()
     
 def atualizar_status_duplo(id_procedimento, bateu):
-    """Atualiza o status do duplo no banco de dados."""
     conexao = conectar()
     cursor = conexao.cursor()
     cursor.execute("UPDATE Procedimentos_Historico SET bateu_duplo = ? WHERE id = ?", (bateu, id_procedimento))
@@ -159,26 +140,24 @@ def atualizar_status_duplo(id_procedimento, bateu):
     conexao.close()
     
 def atualizar_procedimento(id_op, dados):
-    """Atualiza um registro existente no banco."""
     conexao = conectar()
     cursor = conexao.cursor()
     query = """
     UPDATE Procedimentos_Historico SET 
         tipo_procedimento = ?, jogo_time_pa = ?, casas_envolvidas = ?, 
-        lucro_final = ?, valor_freebet_coletada = ?, condicao_freebet = ?, observacao = ?
+        lucro_final = ?, valor_freebet_coletada = ?, condicao_freebet = ?, observacao = ?, casa_destino_freebet = ?, valor_da_freebet = ?
     WHERE id = ?
     """
     valores = (
         dados['tipo_procedimento'], dados['jogo_time_pa'], dados['casas_envolvidas'],
         dados['lucro_final'], dados['valor_freebet_coletada'], dados['condicao_freebet'],
-        dados['observacao'], id_op
+        dados['observacao'], dados.get('casa_destino_freebet', ''), dados.get('valor_da_freebet', 0.0), id_op
     )
     cursor.execute(query, valores)
     conexao.commit()
     conexao.close()
 
 def excluir_procedimento(id_op):
-    """Remove um procedimento do banco."""
     conexao = conectar()
     cursor = conexao.cursor()
     cursor.execute("DELETE FROM Procedimentos_Historico WHERE id = ?", (id_op,))
@@ -186,7 +165,6 @@ def excluir_procedimento(id_op):
     conexao.close()
     
 def listar_meses_disponiveis():
-    """Retorna uma lista de todos os meses/anos que possuem registros (Ex: ['04/2026', '03/2026'])."""
     conexao = conectar()
     cursor = conexao.cursor()
     cursor.execute("SELECT DISTINCT mes_referencia FROM Procedimentos_Historico ORDER BY id DESC")
@@ -195,7 +173,6 @@ def listar_meses_disponiveis():
     return meses
 
 def buscar_dados_mes(mes_ref):
-    """Retorna todos os registros de um mês específico."""
     conexao = conectar()
     cursor = conexao.cursor()
     cursor.execute("SELECT data_operacao, tipo_procedimento, jogo_time_pa, casas_envolvidas, lucro_final, valor_freebet_coletada, bateu_duplo FROM Procedimentos_Historico WHERE mes_referencia = ?", (mes_ref,))
@@ -204,7 +181,6 @@ def buscar_dados_mes(mes_ref):
     return dados
 
 def excluir_casa(nome_casa):
-    """Remove uma casa de aposta do banco de dados."""
     conexao = conectar()
     cursor = conexao.cursor()
     cursor.execute("DELETE FROM Casas_de_Apostas WHERE nome = ?", (nome_casa,))
@@ -212,7 +188,6 @@ def excluir_casa(nome_casa):
     conexao.close()
     
 def listar_casas_com_saldo():
-    """Retorna casas de apostas e seus saldos."""
     conexao = conectar()
     cursor = conexao.cursor()
     cursor.execute("SELECT nome, saldo FROM Casas_de_Apostas ORDER BY nome ASC")
@@ -221,7 +196,6 @@ def listar_casas_com_saldo():
     return dados
 
 def atualizar_saldo_casa(nome_casa, saldo):
-    """Atualiza o saldo de uma casa de apostas."""
     conexao = conectar()
     cursor = conexao.cursor()
     cursor.execute("UPDATE Casas_de_Apostas SET saldo = ? WHERE nome = ?", (saldo, nome_casa))

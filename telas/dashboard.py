@@ -145,7 +145,7 @@ class TelaDashboard(QWidget):
         layout_freebet.setSpacing(15)
 
         topo_freebet = QHBoxLayout()
-        self.lbl_g3 = QLabel("Métricas de Freebets (Quantidade)")
+        self.lbl_g3 = QLabel("")
         self.lbl_g3.setStyleSheet("color: #f4f4f5; font-size: 16px; font-weight: bold; border: none;")
         
         self.btn_toggle_freebet = QPushButton("Ver em Dinheiro (R$)")
@@ -281,10 +281,8 @@ class TelaDashboard(QWidget):
         self.mostrar_valor_freebet = not self.mostrar_valor_freebet
         if self.mostrar_valor_freebet:
             self.btn_toggle_freebet.setText("Ver em Quantidade")
-            self.lbl_g3.setText("Métricas de Freebets (Lucro Líquido)")
         else:
             self.btn_toggle_freebet.setText("Ver em Dinheiro (R$)")
-            self.lbl_g3.setText("Métricas de Freebets (Quantidade)")
         
         self.atualizar_dados()
 
@@ -547,7 +545,7 @@ class TelaDashboard(QWidget):
         x = int(round(mp.x()))
         if 1 <= x <= len(self.dados_dias):
             y = self.dados_freebet_lucro[x - 1] if self.mostrar_valor_freebet else self.dados_freebet_qtd[x - 1]
-            texto = f"R$ {y:.2f}" if self.mostrar_valor_freebet else f"{int(y)} Fb(s)"
+            texto = f"R$ {y:.2f}" if self.mostrar_valor_freebet else f"{int(y)}"
             dentro_barra = (abs(mp.x() - x) <= 0.22 and ((y >= 0 and 0 <= mp.y() <= y) or (y < 0 and y <= mp.y() <= 0)))
 
             if dentro_barra:

@@ -143,19 +143,11 @@ class DialogEscolherCasas(QDialog):
         self.sync_selecionadas(); self.carregar_lista_casas(texto)
         
     def adicionar_nova_casa(self):
-        # 1. Pega o texto digitado e remove espaços vazios nas pontas
         nova_casa = self.input_busca.text().strip()
-        
-        # 2. Verifica se o usuário não deixou em branco
         if nova_casa:
-            # 3. Salva no banco de dados 
             database.adicionar_casa(nova_casa)
-            
-            # 4. Já marca a nova casa como selecionada automaticamente
             if nova_casa not in self.casas_selecionadas:
                 self.casas_selecionadas.append(nova_casa)
-            
-            # 5. Limpa a barra de pesquisa e recarrega a lista para mostrar a casa nova
             self.input_busca.clear()
             self.carregar_lista_casas()
 
@@ -171,8 +163,6 @@ class DialogEscolherCasas(QDialog):
     def get_selecionadas(self):
         return self.casas_selecionadas
     
-    
-
 class DialogFiltros(QDialog):
     """Popup para filtrar os procedimentos na tabela principal"""
     def __init__(self, parent=None, filtros_atuais=None):
@@ -314,7 +304,10 @@ class DialogNovoProcedimento(QDialog):
         grupo_valores = QGroupBox("Valores (R$)")
         self.layout_valores = QFormLayout()
         self.layout_valores.setVerticalSpacing(15)
-        self.input_valor_duplo = QLineEdit()
+        
+        self.input_valor_duplo = QLineEdit() 
+        self.input_valor_freebet = QLineEdit()
+        
         self.check_lucro_igual = QCheckBox("Lucro igual nas posições")
         self.check_lucro_igual.toggled.connect(self.alternar_lucro_igual)
         self.input_entrada = QLineEdit()
@@ -325,7 +318,8 @@ class DialogNovoProcedimento(QDialog):
         self.btn_add_protecao.setStyleSheet("color: #71717a; background: transparent; text-align: left; font-size: 12px; padding: 0;")
         self.btn_add_protecao.clicked.connect(lambda: self.adicionar_campo_protecao())
         
-        self.layout_valores.addRow("Valor Duplo:", self.input_valor_duplo)
+        self.layout_valores.addRow("Valor Duplo (R$):", self.input_valor_duplo)
+        self.layout_valores.addRow("Valor da Freebet (R$):", self.input_valor_freebet)
         self.layout_valores.addRow("", self.check_lucro_igual)
         self.layout_valores.addRow("Entrada principal:", self.input_entrada)
         self.adicionar_campo_protecao(texto_padrao="Proteção 1:", eh_padrao=True)
@@ -388,16 +382,30 @@ class DialogNovoProcedimento(QDialog):
         if dialog.exec() == QDialog.Accepted:
             sel = dialog.get_selecionadas()
             if sel:
-                self.lbl_casa_freebet.setText(sel[0]); self.lbl_casa_freebet.setStyleSheet(f"color: {COR_AZUL_DESTAQUE};")
-            else: self.lbl_casa_freebet.setText(""); self.lbl_casa_freebet.setStyleSheet("color: #a1a1aa;")
+                casa_escolhida = sel[0]
+                self.lbl_casa_freebet.setText(casa_escolhida)
+                self.lbl_casa_freebet.setStyleSheet(f"color: {COR_AZUL_DESTAQUE};")
+                if self.tipo_selecionado in ["Coletar Freebet", "Converter Freebet"]:
+                    self.lbl_casas_selecionadas.setText(casa_escolhida)
+                    self.lbl_casas_selecionadas.setStyleSheet(f"color: {COR_AZUL_DESTAQUE};")
+            else: 
+                self.lbl_casa_freebet.setText("")
+                self.lbl_casa_freebet.setStyleSheet("color: #a1a1aa;")
 
     def abrir_seletor_casas(self):
         atuais = self.lbl_casas_selecionadas.text().split(" | ") if self.lbl_casas_selecionadas.text() != "Nenhuma selecionada" else []
         dialog = DialogEscolherCasas(self, atuais)
         if dialog.exec() == QDialog.Accepted:
             sel = dialog.get_selecionadas()
-            if sel: self.lbl_casas_selecionadas.setText(" | ".join(sel)); self.lbl_casas_selecionadas.setStyleSheet(f"color: {COR_AZUL_DESTAQUE};")
-            else: self.lbl_casas_selecionadas.setText("Nenhuma selecionada"); self.lbl_casas_selecionadas.setStyleSheet("color: #a1a1aa;")
+            if sel: 
+                self.lbl_casas_selecionadas.setText(" | ".join(sel))
+                self.lbl_casas_selecionadas.setStyleSheet(f"color: {COR_AZUL_DESTAQUE};")
+                if self.tipo_selecionado in ["Coletar Freebet", "Converter Freebet"]:
+                    self.lbl_casa_freebet.setText(sel[0])
+                    self.lbl_casa_freebet.setStyleSheet(f"color: {COR_AZUL_DESTAQUE};")
+            else: 
+                self.lbl_casas_selecionadas.setText("Nenhuma selecionada")
+                self.lbl_casas_selecionadas.setStyleSheet("color: #a1a1aa;")
 
     def selecionar_tipo(self, tipo):
         self.tipo_selecionado = tipo
@@ -406,18 +414,28 @@ class DialogNovoProcedimento(QDialog):
             else: btn.setStyleSheet("background-color: #27272a; color: #a1a1aa;")
             
         is_cassino = (tipo == "Cassino")
+        is_coleta = (tipo == "Coletar Freebet")
+        is_conversao = (tipo == "Converter Freebet")
         
-        self.grupo_detalhes.setVisible(tipo not in ["SureBet", "Cassino"])
+        self.grupo_detalhes.setVisible(not is_cassino and tipo != "SureBet")
+        
+        # Valor Freebet APENAS para Coletar Freebet
+        self.input_valor_freebet.setVisible(is_coleta)
+        lbl_vfb = self.layout_valores.labelForField(self.input_valor_freebet)
+        if lbl_vfb: lbl_vfb.setVisible(is_coleta)
+        
+        # Valor Duplo aparece sempre que não for Cassino ou Surebet
         self.input_valor_duplo.setVisible(not is_cassino and tipo != "SureBet")
         lbl_vd = self.layout_valores.labelForField(self.input_valor_duplo)
         if lbl_vd: lbl_vd.setVisible(not is_cassino and tipo != "SureBet")
         
-        is_coleta = (tipo == "Coletar Freebet")
-        self.combo_condicao.setVisible(is_coleta); self.container_casa_fb.setVisible(is_coleta)
+        self.combo_condicao.setVisible(is_coleta)
+        self.container_casa_fb.setVisible(is_coleta or is_conversao)
+        
         lbl_cond = self.layout_detalhes.labelForField(self.combo_condicao)
         if lbl_cond: lbl_cond.setVisible(is_coleta)
         lbl_cfb = self.layout_detalhes.labelForField(self.container_casa_fb)
-        if lbl_cfb: lbl_cfb.setVisible(is_coleta)
+        if lbl_cfb: lbl_cfb.setVisible(is_coleta or is_conversao)
 
         self.check_lucro_igual.setVisible(not is_cassino)
         if is_cassino:
@@ -449,7 +467,9 @@ class DialogNovoProcedimento(QDialog):
         d = self.dados_edicao; self.selecionar_tipo(d['tipo']); self.input_jogo.setText(d['jogo'])
         if d['casas'] not in ["None", "-", ""]: self.lbl_casas_selecionadas.setText(d['casas']); self.lbl_casas_selecionadas.setStyleSheet(f"color: {COR_AZUL_DESTAQUE};")
         if d.get('casa_fb') not in ["None", "-", ""]: self.lbl_casa_freebet.setText(d['casa_fb']); self.lbl_casa_freebet.setStyleSheet(f"color: {COR_AZUL_DESTAQUE};")
-        self.check_lucro_igual.setChecked(True); self.input_entrada.setText(str(d['lucro_base'])); self.input_valor_duplo.setText(str(d['v_duplo']))
+        self.check_lucro_igual.setChecked(True); self.input_entrada.setText(str(d['lucro_base']))
+        self.input_valor_duplo.setText(str(d['v_duplo']))
+        self.input_valor_freebet.setText(str(d.get('v_fb', 0.0)))
         if d['obs']: self.mostrar_campo_obs(); self.input_obs.setText(d['obs'])
         self.combo_condicao.setCurrentText(d.get('condicao', ''))
 
@@ -459,7 +479,7 @@ class DialogNovoProcedimento(QDialog):
             
             if self.tipo_selecionado == "Cassino":
                 l_base = v_ent
-                jogo_nome = "Jogo de Cassino"
+                jogo_nome = "-"
             else:
                 jogo_nome = self.input_jogo.text()
                 if self.check_lucro_igual.isChecked(): l_base = v_ent
@@ -475,19 +495,20 @@ class DialogNovoProcedimento(QDialog):
                 'data_operacao': datetime.now().strftime("%d/%m/%Y"), 'tipo_procedimento': self.tipo_selecionado,
                 'casas_envolvidas': c_env, 'jogo_time_pa': jogo_nome, 'lucro_final': l_base,
                 'valor_freebet_coletada': float(self.input_valor_duplo.text().replace(',', '.')) if self.input_valor_duplo.isVisible() and self.input_valor_duplo.text() else 0.0,
+                'valor_da_freebet': float(self.input_valor_freebet.text().replace(',', '.')) if self.input_valor_freebet.isVisible() and self.input_valor_freebet.text() else 0.0,
                 'condicao_freebet': self.combo_condicao.currentText() if self.combo_condicao.isVisible() else '',
                 'observacao': self.input_obs.text(), 'mes_referencia': datetime.now().strftime("%m/%Y"),
-                'casa_destino_freebet': self.lbl_casa_freebet.text() if self.tipo_selecionado == "Coletar Freebet" else "",
+                'casa_destino_freebet': self.lbl_casa_freebet.text() if self.tipo_selecionado in ["Coletar Freebet", "Converter Freebet"] else "",
                 'status_freebet': 'Pendente' if self.tipo_selecionado == "Coletar Freebet" else 'N/A'
             }
             self.accept()
         except: QMessageBox.warning(self, "Erro", "Verifique os números.")
+
 class TabelaProcedimentos(QTableWidget):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.hover_row = -1
         
-        # O próprio widget se gerencia:
         self.setMouseTracking(True)
         self.viewport().setMouseTracking(True)
         self.cellEntered.connect(self._ao_fazer_hover)
@@ -548,31 +569,20 @@ class TelaProcedimentos(QWidget):
         self.tabela.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.tabela.horizontalHeader().setSectionResizeMode(7, QHeaderView.Fixed)
         self.tabela.setColumnWidth(7, 50)
-        self.tabela.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-
-        # Configuração da coluna 0 (Data)
+        
         self.tabela.horizontalHeader().setSectionResizeMode(0, QHeaderView.Fixed)
         self.tabela.setColumnWidth(0, 60)
-        
-        # Configuração da coluna 5 (Duplo?)
         self.tabela.horizontalHeader().setSectionResizeMode(5, QHeaderView.Fixed)
-        self.tabela.setColumnWidth(5, 60)
+        self.tabela.setColumnWidth(5, 75)
 
-        # Configuração da coluna 7 (Botão de ações)
-        self.tabela.horizontalHeader().setSectionResizeMode(7, QHeaderView.Fixed)
-        self.tabela.setColumnWidth(7, 50)
-        
         self.tabela.verticalHeader().setVisible(False)
         self.tabela.verticalHeader().setDefaultSectionSize(75)
         self.tabela.setEditTriggers(QTableWidget.NoEditTriggers)
         self.tabela.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.tabela.setSelectionMode(QAbstractItemView.NoSelection)
         
-        # --- CONFIGURAÇÃO DO HOVER DE LINHA MODERNO ---
         self.tabela.setShowGrid(False)
         self.tabela.setFocusPolicy(Qt.NoFocus)
-        self.tabela.setMouseTracking(True)
-        self.tabela.viewport().setMouseTracking(True)
 
         self.tabela.setStyleSheet("""
             QTableWidget {
@@ -612,13 +622,14 @@ class TelaProcedimentos(QWidget):
         self.tabela.setRowCount(0)
         f_t = self.input_busca.text().lower()
         conexao = database.conectar(); cursor = conexao.cursor()
-        cursor.execute("SELECT id, data_operacao, tipo_procedimento, jogo_time_pa, casas_envolvidas, lucro_final, valor_freebet_coletada, bateu_duplo, condicao_freebet, observacao, casa_destino_freebet FROM Procedimentos_Historico ORDER BY id DESC")
+        cursor.execute("SELECT id, data_operacao, tipo_procedimento, jogo_time_pa, casas_envolvidas, lucro_final, valor_freebet_coletada, bateu_duplo, condicao_freebet, observacao, casa_destino_freebet, valor_da_freebet FROM Procedimentos_Historico ORDER BY id DESC")
         
-        for id_op, data, tipo, jogo, casas, lucro, v_duplo, bateu, cond, obs, casa_fb in cursor.fetchall():
+        for id_op, data, tipo, jogo, casas, lucro, v_duplo, bateu, cond, obs, casa_fb, v_fb in cursor.fetchall():
             if f_t and f_t not in jogo.lower() and f_t not in casas.lower(): continue
             if self.filtros_avancados["tipos"] and tipo not in self.filtros_avancados["tipos"]: continue
             if self.filtros_avancados["casas"] and not any(c in casas for c in self.filtros_avancados["casas"]): continue
 
+            v_fb = v_fb or 0.0
             row = self.tabela.rowCount(); self.tabela.insertRow(row)
             def item(t, cor=None):
                 it = QTableWidgetItem(str(t) if t not in ["None", None, ""] else "-")
@@ -651,7 +662,7 @@ class TelaProcedimentos(QWidget):
             if obs: 
                 menu.addAction("Ver Obs").triggered.connect(lambda checked=False, o=obs: self.mostrar_observacao(o))
             
-            dados_edicao = {'tipo':tipo, 'jogo':jogo, 'casas':casas, 'lucro_base':lucro, 'v_duplo':v_duplo, 'obs':obs, 'condicao':cond, 'casa_fb':casa_fb}
+            dados_edicao = {'tipo':tipo, 'jogo':jogo, 'casas':casas, 'lucro_base':lucro, 'v_duplo':v_duplo, 'obs':obs, 'condicao':cond, 'casa_fb':casa_fb, 'v_fb':v_fb}
             menu.addAction("Editar").triggered.connect(lambda checked=False, d=dados_edicao, i=id_op: self.abrir_pop_up(d, i))
             
             menu.addAction("Excluir").triggered.connect(lambda checked=False, i=id_op: self.excluir_procedimento(i))

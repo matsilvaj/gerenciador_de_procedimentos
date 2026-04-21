@@ -69,11 +69,13 @@ class MainWindow(QMainWindow):
         self.btn_calculadora.clicked.connect(lambda: self.mudar_tela(self.btn_calculadora, self.tela_calculadora))
         self.btn_historico.clicked.connect(lambda: self.mudar_tela(self.btn_historico, self.tela_historico))
 
+        # Conecta o sinal da aba de freebets para enviar as informações para a calculadora
+        self.tela_freebets.sinal_converter_calculadora.connect(self.ir_para_calculadora_com_freebet)
+
         self.aplicar_estilo()
         self.mudar_tela(self.btn_dashboard, self.tela_dashboard)
 
     def aplicar_estilo(self):
-        # A MÁGICA DA FONTE SUAVE: Aplicada a todo o app (*)
         estilo = """
         * {
             font-family: 'Inter', 'Segoe UI Variable', 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
@@ -97,6 +99,12 @@ class MainWindow(QMainWindow):
         }
         """
         self.setStyleSheet(estilo)
+
+    def ir_para_calculadora_com_freebet(self, casa, valor_total, ids):
+        # Preenche as informações na calculadora
+        self.tela_calculadora.preencher_dados_freebet(casa, valor_total, ids)
+        # Muda para a tela da calculadora
+        self.mudar_tela(self.btn_calculadora, self.tela_calculadora)
         
     def mudar_tela(self, botao_ativo, tela_alvo):
         for btn in [self.btn_dashboard, self.btn_procedimentos, self.btn_freebets, self.btn_casas, self.btn_calculadora, self.btn_historico]:
