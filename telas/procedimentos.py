@@ -195,7 +195,7 @@ class DialogFiltros(QDialog):
         grupo_tipos = QGroupBox("Tipo de Procedimento")
         lay_tipos = QVBoxLayout()
         self.checks_tipos = {}
-        for t in ["SureBet", "Tentativa de Duplo", "Coletar Freebet", "Converter Freebet"]:
+        for t in ["SureBet", "Tentativa de Duplo", "Coletar Freebet", "Converter Freebet", "Cassino"]:
             chk = QCheckBox(t)
             if t in self.filtros_atuais["tipos"]: chk.setChecked(True)
             lay_tipos.addWidget(chk)
@@ -271,7 +271,7 @@ class DialogNovoProcedimento(QDialog):
         layout_botoes = QHBoxLayout()
         layout_botoes.setSpacing(10)
         self.botoes_tipo = []
-        for tipo in ["SureBet", "Tentativa de Duplo", "Coletar Freebet", "Converter Freebet"]:
+        for tipo in ["SureBet", "Tentativa de Duplo", "Coletar Freebet", "Converter Freebet", "Cassino"]:
             btn = QPushButton(tipo)
             btn.setCursor(Qt.PointingHandCursor)
             btn.clicked.connect(lambda checked, t=tipo: self.selecionar_tipo(t))
@@ -404,13 +404,35 @@ class DialogNovoProcedimento(QDialog):
         for btn in self.botoes_tipo:
             if btn.text() == tipo: btn.setStyleSheet("background-color: #f4f4f5; color: #09090b; font-weight: bold;")
             else: btn.setStyleSheet("background-color: #27272a; color: #a1a1aa;")
-        self.grupo_detalhes.setVisible(tipo != "SureBet")
-        self.input_valor_duplo.setVisible(tipo != "SureBet")
-        self.layout_valores.labelForField(self.input_valor_duplo).setVisible(tipo != "SureBet")
+            
+        is_cassino = (tipo == "Cassino")
+        
+        self.grupo_detalhes.setVisible(tipo not in ["SureBet", "Cassino"])
+        self.input_valor_duplo.setVisible(not is_cassino and tipo != "SureBet")
+        lbl_vd = self.layout_valores.labelForField(self.input_valor_duplo)
+        if lbl_vd: lbl_vd.setVisible(not is_cassino and tipo != "SureBet")
+        
         is_coleta = (tipo == "Coletar Freebet")
         self.combo_condicao.setVisible(is_coleta); self.container_casa_fb.setVisible(is_coleta)
-        self.layout_detalhes.labelForField(self.combo_condicao).setVisible(is_coleta)
-        self.layout_detalhes.labelForField(self.container_casa_fb).setVisible(is_coleta)
+        lbl_cond = self.layout_detalhes.labelForField(self.combo_condicao)
+        if lbl_cond: lbl_cond.setVisible(is_coleta)
+        lbl_cfb = self.layout_detalhes.labelForField(self.container_casa_fb)
+        if lbl_cfb: lbl_cfb.setVisible(is_coleta)
+
+        self.check_lucro_igual.setVisible(not is_cassino)
+        if is_cassino:
+            self.btn_add_protecao.setVisible(False)
+            for c in self.lista_containers_protecoes:
+                c.setVisible(False)
+                lbl = self.layout_valores.labelForField(c)
+                if lbl: lbl.setVisible(False)
+        else:
+            self.alternar_lucro_igual(self.check_lucro_igual.isChecked())
+
+        lbl_base = self.layout_valores.labelForField(self.input_entrada)
+        if lbl_base:
+            if is_cassino: lbl_base.setText("Lucro / Perda (R$):")
+            else: lbl_base.setText("Valor Único:" if self.check_lucro_igual.isChecked() else "Entrada principal:")
 
     def alternar_lucro_igual(self, marcado):
         for container in self.lista_containers_protecoes:
@@ -425,8 +447,8 @@ class DialogNovoProcedimento(QDialog):
 
     def preencher_dados_edicao(self):
         d = self.dados_edicao; self.selecionar_tipo(d['tipo']); self.input_jogo.setText(d['jogo'])
-        if d['casas'] not in ["None", "---", ""]: self.lbl_casas_selecionadas.setText(d['casas']); self.lbl_casas_selecionadas.setStyleSheet(f"color: {COR_AZUL_DESTAQUE};")
-        if d.get('casa_fb') not in ["None", "---", ""]: self.lbl_casa_freebet.setText(d['casa_fb']); self.lbl_casa_freebet.setStyleSheet(f"color: {COR_AZUL_DESTAQUE};")
+        if d['casas'] not in ["None", "-", ""]: self.lbl_casas_selecionadas.setText(d['casas']); self.lbl_casas_selecionadas.setStyleSheet(f"color: {COR_AZUL_DESTAQUE};")
+        if d.get('casa_fb') not in ["None", "-", ""]: self.lbl_casa_freebet.setText(d['casa_fb']); self.lbl_casa_freebet.setStyleSheet(f"color: {COR_AZUL_DESTAQUE};")
         self.check_lucro_igual.setChecked(True); self.input_entrada.setText(str(d['lucro_base'])); self.input_valor_duplo.setText(str(d['v_duplo']))
         if d['obs']: self.mostrar_campo_obs(); self.input_obs.setText(d['obs'])
         self.combo_condicao.setCurrentText(d.get('condicao', ''))
@@ -434,18 +456,25 @@ class DialogNovoProcedimento(QDialog):
     def processar_e_salvar(self):
         try:
             v_ent = float(self.input_entrada.text().replace(',', '.'))
-            if self.check_lucro_igual.isChecked(): l_base = v_ent
+            
+            if self.tipo_selecionado == "Cassino":
+                l_base = v_ent
+                jogo_nome = "Jogo de Cassino"
             else:
-                soma = v_ent; cont = 1
-                for inp in self.lista_inputs_protecoes:
-                    txt = inp.text().replace(',', '.')
-                    if txt: soma += float(txt); cont += 1
-                l_base = soma / cont
+                jogo_nome = self.input_jogo.text()
+                if self.check_lucro_igual.isChecked(): l_base = v_ent
+                else:
+                    soma = v_ent; cont = 1
+                    for inp in self.lista_inputs_protecoes:
+                        txt = inp.text().replace(',', '.')
+                        if txt: soma += float(txt); cont += 1
+                    l_base = soma / cont
+                    
             c_env = self.lbl_casas_selecionadas.text() if self.lbl_casas_selecionadas.text() != "Nenhuma selecionada" else ""
             self.dados_finais = {
                 'data_operacao': datetime.now().strftime("%d/%m/%Y"), 'tipo_procedimento': self.tipo_selecionado,
-                'casas_envolvidas': c_env, 'jogo_time_pa': self.input_jogo.text(), 'lucro_final': l_base,
-                'valor_freebet_coletada': float(self.input_valor_duplo.text().replace(',', '.')) if self.input_valor_duplo.text() else 0.0,
+                'casas_envolvidas': c_env, 'jogo_time_pa': jogo_nome, 'lucro_final': l_base,
+                'valor_freebet_coletada': float(self.input_valor_duplo.text().replace(',', '.')) if self.input_valor_duplo.isVisible() and self.input_valor_duplo.text() else 0.0,
                 'condicao_freebet': self.combo_condicao.currentText() if self.combo_condicao.isVisible() else '',
                 'observacao': self.input_obs.text(), 'mes_referencia': datetime.now().strftime("%m/%Y"),
                 'casa_destino_freebet': self.lbl_casa_freebet.text() if self.tipo_selecionado == "Coletar Freebet" else "",
@@ -534,7 +563,7 @@ class TelaProcedimentos(QWidget):
         self.tabela.setColumnWidth(7, 50)
         
         self.tabela.verticalHeader().setVisible(False)
-        self.tabela.verticalHeader().setDefaultSectionSize(55)
+        self.tabela.verticalHeader().setDefaultSectionSize(75)
         self.tabela.setEditTriggers(QTableWidget.NoEditTriggers)
         self.tabela.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.tabela.setSelectionMode(QAbstractItemView.NoSelection)
@@ -592,7 +621,7 @@ class TelaProcedimentos(QWidget):
 
             row = self.tabela.rowCount(); self.tabela.insertRow(row)
             def item(t, cor=None):
-                it = QTableWidgetItem(str(t) if t not in ["None", None, ""] else "---")
+                it = QTableWidgetItem(str(t) if t not in ["None", None, ""] else "-")
                 it.setTextAlignment(Qt.AlignCenter); (it.setForeground(QBrush(QColor(cor))) if cor else None); return it
 
             self.tabela.setItem(row, 0, item(data.split('/')[0]))

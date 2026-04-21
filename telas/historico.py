@@ -50,7 +50,7 @@ class TelaHistorico(QWidget):
         self.tabela.setHorizontalHeaderLabels(["Data", "Tipo", "Jogo", "Casas", "Lucro Base", "Lucro Final"])
         self.tabela.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.tabela.verticalHeader().setVisible(False)
-        self.tabela.verticalHeader().setDefaultSectionSize(55)
+        self.tabela.verticalHeader().setDefaultSectionSize(75)
         self.tabela.setEditTriggers(QTableWidget.NoEditTriggers)
         self.tabela.setSelectionBehavior(QTableWidget.SelectRows)
         self.tabela.setSelectionMode(QTableWidget.NoSelection)

@@ -46,16 +46,22 @@ def atualizar_schema():
     """Adiciona colunas novas em bancos já existentes sem apagar dados."""
     conexao = conectar()
     cursor = conexao.cursor()
+    
+    # Atualiza tabela de Histórico
     cursor.execute("PRAGMA table_info(Procedimentos_Historico)")
     colunas = [col[1] for col in cursor.fetchall()]
-    
     if 'casa_destino_freebet' not in colunas:
         cursor.execute("ALTER TABLE Procedimentos_Historico ADD COLUMN casa_destino_freebet TEXT")
     if 'status_freebet' not in colunas:
         cursor.execute("ALTER TABLE Procedimentos_Historico ADD COLUMN status_freebet TEXT DEFAULT 'Pendente'")
-    # --- NOVA COLUNA ADICIONADA ---
     if 'id_freebet_origem' not in colunas:
         cursor.execute("ALTER TABLE Procedimentos_Historico ADD COLUMN id_freebet_origem INTEGER")
+        
+    # Atualiza tabela de Casas de Apostas (NOVO PARA O CONTROLE DE SALDO)
+    cursor.execute("PRAGMA table_info(Casas_de_Apostas)")
+    colunas_casas = [col[1] for col in cursor.fetchall()]
+    if 'saldo' not in colunas_casas:
+        cursor.execute("ALTER TABLE Casas_de_Apostas ADD COLUMN saldo REAL DEFAULT 0.0")
     
     conexao.commit()
     conexao.close()
@@ -202,5 +208,22 @@ def excluir_casa(nome_casa):
     conexao = conectar()
     cursor = conexao.cursor()
     cursor.execute("DELETE FROM Casas_de_Apostas WHERE nome = ?", (nome_casa,))
+    conexao.commit()
+    conexao.close()
+    
+def listar_casas_com_saldo():
+    """Retorna casas de apostas e seus saldos."""
+    conexao = conectar()
+    cursor = conexao.cursor()
+    cursor.execute("SELECT nome, saldo FROM Casas_de_Apostas ORDER BY nome ASC")
+    dados = cursor.fetchall()
+    conexao.close()
+    return dados
+
+def atualizar_saldo_casa(nome_casa, saldo):
+    """Atualiza o saldo de uma casa de apostas."""
+    conexao = conectar()
+    cursor = conexao.cursor()
+    cursor.execute("UPDATE Casas_de_Apostas SET saldo = ? WHERE nome = ?", (saldo, nome_casa))
     conexao.commit()
     conexao.close()

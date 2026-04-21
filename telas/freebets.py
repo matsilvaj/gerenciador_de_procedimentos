@@ -54,7 +54,7 @@ class TelaFreebets(QWidget):
             tabela.setColumnWidth(4, 90)
 
         tabela.verticalHeader().setVisible(False)
-        tabela.verticalHeader().setDefaultSectionSize(55)
+        tabela.verticalHeader().setDefaultSectionSize(75)
         tabela.setEditTriggers(QTableWidget.NoEditTriggers) 
         tabela.setSelectionBehavior(QTableWidget.SelectRows)
         tabela.setSelectionMode(QTableWidget.NoSelection)
