@@ -641,10 +641,14 @@ class TelaProcedimentos(QWidget):
             it_c = item(casas); it_c.setToolTip(casas); self.tabela.setItem(row, 3, it_c)
             self.tabela.setItem(row, 4, item(f"R$ {lucro:.2f}", COR_VERDE if lucro >= 0 else COR_VERMELHO))
 
-            if tipo == "SureBet":
+            if tipo in ["SureBet", "Cassino"]:
+                # Coloca "-" no Lucro Base e no Duplo para SureBet e Cassino
+                self.tabela.setItem(row, 4, item("-", "#71717a"))
                 self.tabela.setItem(row, 5, item("-", "#71717a"))
                 self.tabela.setItem(row, 6, item(f"R$ {lucro:.2f}", COR_VERDE if lucro >= 0 else COR_VERMELHO))
             else:
+                # Mostra o Lucro Base e a checkbox do Duplo para os demais procedimentos
+                self.tabela.setItem(row, 4, item(f"R$ {lucro:.2f}", COR_VERDE if lucro >= 0 else COR_VERMELHO))
                 cb = QCheckBox(); cb.setChecked(bool(bateu))
                 cb.stateChanged.connect(lambda s, i=id_op, lb=lucro, vd=v_duplo, r=row: self.atualizar_duplo_tela(s, i, lb, vd, r))
                 self.tabela.setCellWidget(row, 5, CheckBoxContainer(cb))
