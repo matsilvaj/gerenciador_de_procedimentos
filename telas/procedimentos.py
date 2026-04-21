@@ -67,6 +67,7 @@ class DialogEscolherCasas(QDialog):
         
         self.btn_modo_exclusao = QPushButton("Excluir")
         self.btn_modo_exclusao.setStyleSheet("background-color: transparent; color: #71717a;")
+        self.btn_modo_exclusao.setAutoDefault(False)
         self.btn_modo_exclusao.clicked.connect(self.alternar_modo_exclusao)
         
         topo_layout.addWidget(self.input_busca)
@@ -87,6 +88,8 @@ class DialogEscolherCasas(QDialog):
         botoes_layout.addStretch() 
         self.btn_ok = QPushButton("CONFIRMAR")
         self.btn_ok.setStyleSheet(f"background-color: {COR_AZUL_DESTAQUE}; color: white; padding: 10px 20px; border-radius: 8px;")
+        self.btn_ok.setAutoDefault(False)
+        self.btn_ok.setDefault(False)
         self.btn_ok.clicked.connect(self.confirmar_e_fechar)
         botoes_layout.addWidget(self.btn_ok)
         layout.addLayout(botoes_layout)
@@ -138,6 +141,23 @@ class DialogEscolherCasas(QDialog):
 
     def filtrar_casas(self, texto):
         self.sync_selecionadas(); self.carregar_lista_casas(texto)
+        
+    def adicionar_nova_casa(self):
+        # 1. Pega o texto digitado e remove espaços vazios nas pontas
+        nova_casa = self.input_busca.text().strip()
+        
+        # 2. Verifica se o usuário não deixou em branco
+        if nova_casa:
+            # 3. Salva no banco de dados 
+            database.adicionar_casa(nova_casa)
+            
+            # 4. Já marca a nova casa como selecionada automaticamente
+            if nova_casa not in self.casas_selecionadas:
+                self.casas_selecionadas.append(nova_casa)
+            
+            # 5. Limpa a barra de pesquisa e recarrega a lista para mostrar a casa nova
+            self.input_busca.clear()
+            self.carregar_lista_casas()
 
     def deletar_casa(self, nome_casa):
         if QMessageBox.question(self, "Excluir", f"Deseja excluir '{nome_casa}'?", QMessageBox.Yes | QMessageBox.No) == QMessageBox.Yes:
@@ -150,6 +170,8 @@ class DialogEscolherCasas(QDialog):
 
     def get_selecionadas(self):
         return self.casas_selecionadas
+    
+    
 
 class DialogFiltros(QDialog):
     """Popup para filtrar os procedimentos na tabela principal"""
@@ -497,7 +519,22 @@ class TelaProcedimentos(QWidget):
         self.tabela.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.tabela.horizontalHeader().setSectionResizeMode(7, QHeaderView.Fixed)
         self.tabela.setColumnWidth(7, 50)
+        self.tabela.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+
+        # Configuração da coluna 0 (Data)
+        self.tabela.horizontalHeader().setSectionResizeMode(0, QHeaderView.Fixed)
+        self.tabela.setColumnWidth(0, 60)
+        
+        # Configuração da coluna 5 (Duplo?)
+        self.tabela.horizontalHeader().setSectionResizeMode(5, QHeaderView.Fixed)
+        self.tabela.setColumnWidth(5, 60)
+
+        # Configuração da coluna 7 (Botão de ações)
+        self.tabela.horizontalHeader().setSectionResizeMode(7, QHeaderView.Fixed)
+        self.tabela.setColumnWidth(7, 50)
+        
         self.tabela.verticalHeader().setVisible(False)
+        self.tabela.verticalHeader().setDefaultSectionSize(55)
         self.tabela.setEditTriggers(QTableWidget.NoEditTriggers)
         self.tabela.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.tabela.setSelectionMode(QAbstractItemView.NoSelection)
@@ -546,7 +583,7 @@ class TelaProcedimentos(QWidget):
         self.tabela.setRowCount(0)
         f_t = self.input_busca.text().lower()
         conexao = database.conectar(); cursor = conexao.cursor()
-        cursor.execute("SELECT id, data_operacao, tipo_procedimento, jogo_time_pa, casas_envolvidas, lucro_final, valor_freebet_coletada, bateu_duplo, condicao_freebet, observacao, casa_destino_freebet FROM Procedimentos_Historico")
+        cursor.execute("SELECT id, data_operacao, tipo_procedimento, jogo_time_pa, casas_envolvidas, lucro_final, valor_freebet_coletada, bateu_duplo, condicao_freebet, observacao, casa_destino_freebet FROM Procedimentos_Historico ORDER BY id DESC")
         
         for id_op, data, tipo, jogo, casas, lucro, v_duplo, bateu, cond, obs, casa_fb in cursor.fetchall():
             if f_t and f_t not in jogo.lower() and f_t not in casas.lower(): continue
@@ -582,9 +619,13 @@ class TelaProcedimentos(QWidget):
             """)
             menu = QMenu(self)
             menu.setStyleSheet("QMenu { background-color: #18181b; color: #f4f4f5; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05); outline: none; } QMenu::item { padding: 10px 25px; } QMenu::item:selected { background-color: #27272a; }")
-            if obs: menu.addAction("Ver Obs").triggered.connect(lambda: self.mostrar_observacao(obs))
-            menu.addAction("Editar").triggered.connect(lambda: self.abrir_pop_up({'tipo':tipo,'jogo':jogo,'casas':casas,'lucro_base':lucro,'v_duplo':v_duplo,'obs':obs,'condicao':cond,'casa_fb':casa_fb}, id_op))
-            menu.addAction("Excluir").triggered.connect(lambda: self.excluir_procedimento(id_op))
+            if obs: 
+                menu.addAction("Ver Obs").triggered.connect(lambda checked=False, o=obs: self.mostrar_observacao(o))
+            
+            dados_edicao = {'tipo':tipo, 'jogo':jogo, 'casas':casas, 'lucro_base':lucro, 'v_duplo':v_duplo, 'obs':obs, 'condicao':cond, 'casa_fb':casa_fb}
+            menu.addAction("Editar").triggered.connect(lambda checked=False, d=dados_edicao, i=id_op: self.abrir_pop_up(d, i))
+            
+            menu.addAction("Excluir").triggered.connect(lambda checked=False, i=id_op: self.excluir_procedimento(i))
             btn_acoes.setMenu(menu); self.tabela.setCellWidget(row, 7, btn_acoes)
 
     def atualizar_duplo_tela(self, state, id_op, base, duplo, row, save=True):

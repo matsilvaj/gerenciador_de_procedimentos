@@ -302,6 +302,19 @@ class TelaDashboard(QWidget):
                 FROM Procedimentos_Historico
                 WHERE mes_referencia = ?
             """, (mes_atual,))
+        elif filtro == "Converter Freebet":
+            # Aqui unimos a Conversão (v) com sua Coleta de origem (c)
+            # E somamos o lucro de ambas para obter o valor real (Total líquido)
+            cursor.execute("""
+                SELECT v.data_operacao, 
+                       COALESCE(v.lucro_final, 0) + COALESCE(c.lucro_final, 0) + CASE WHEN c.bateu_duplo IN (1, 'true', 'True') THEN COALESCE(c.valor_freebet_coletada, 0) ELSE 0 END AS lucro_final, 
+                       v.tipo_procedimento,
+                       v.valor_freebet_coletada, 
+                       v.bateu_duplo
+                FROM Procedimentos_Historico v
+                INNER JOIN Procedimentos_Historico c ON v.id_freebet_origem = c.id
+                WHERE v.mes_referencia = ? AND v.tipo_procedimento = 'Converter Freebet'
+            """, (mes_atual,))
         else:
             cursor.execute("""
                 SELECT data_operacao, lucro_final, tipo_procedimento,
@@ -346,6 +359,7 @@ class TelaDashboard(QWidget):
 
             if tipo == "Coletar Freebet":
                 freebet_qtd_dia[dia_inteiro] += 1
+                freebet_lucro_dia[dia_inteiro] += lucro_real
 
             if tipo == "Converter Freebet":
                 freebet_lucro_dia[dia_inteiro] += lucro_real

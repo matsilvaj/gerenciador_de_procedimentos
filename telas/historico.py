@@ -50,9 +50,10 @@ class TelaHistorico(QWidget):
         self.tabela.setHorizontalHeaderLabels(["Data", "Tipo", "Jogo", "Casas", "Lucro Base", "Lucro Final"])
         self.tabela.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.tabela.verticalHeader().setVisible(False)
+        self.tabela.verticalHeader().setDefaultSectionSize(55)
         self.tabela.setEditTriggers(QTableWidget.NoEditTriggers)
         self.tabela.setSelectionBehavior(QTableWidget.SelectRows)
-        self.tabela.setSelectionMode(QTableWidget.SingleSelection) 
+        self.tabela.setSelectionMode(QTableWidget.NoSelection)
         
         self.tabela.setFocusPolicy(Qt.NoFocus)
         self.tabela.setShowGrid(False)
@@ -61,7 +62,7 @@ class TelaHistorico(QWidget):
         self.tabela.setStyleSheet("""
             QTableWidget { background-color: transparent; color: #f4f4f5; border: none; gridline-color: transparent; font-size: 14px; outline: none; }
             QTableWidget::item { border: none; border-bottom: 1px solid rgba(255,255,255,0.03); padding: 5px; }
-            QTableWidget::item:selected { background-color: rgba(255,255,255,0.04); color: #f4f4f5; }
+            QTableWidget::item:selected { background-color: transparent; color: #f4f4f5; }
             QHeaderView::section { background-color: transparent; color: #71717a; font-weight: bold; border: none; border-bottom: 1px solid rgba(255,255,255,0.05); padding: 12px 8px; }
             QHeaderView::section:hover { background-color: transparent; }
         """)

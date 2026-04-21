@@ -54,9 +54,10 @@ class TelaFreebets(QWidget):
             tabela.setColumnWidth(4, 90)
 
         tabela.verticalHeader().setVisible(False)
+        tabela.verticalHeader().setDefaultSectionSize(55)
         tabela.setEditTriggers(QTableWidget.NoEditTriggers) 
         tabela.setSelectionBehavior(QTableWidget.SelectRows)
-        tabela.setSelectionMode(QTableWidget.SingleSelection) 
+        tabela.setSelectionMode(QTableWidget.NoSelection)
         
         tabela.setFocusPolicy(Qt.NoFocus)
         tabela.setShowGrid(False)
@@ -65,7 +66,7 @@ class TelaFreebets(QWidget):
         tabela.setStyleSheet("""
             QTableWidget { background-color: transparent; color: #f4f4f5; border: none; outline: none; font-size: 14px; }
             QTableWidget::item { border: none; border-bottom: 1px solid rgba(255,255,255,0.03); padding: 5px; }
-            QTableWidget::item:selected { background-color: rgba(255,255,255,0.04); color: #f4f4f5; border: none; }
+            QTableWidget::item:selected { background-color: transparent; color: #f4f4f5; border: none; }
             QHeaderView::section { background-color: transparent; color: #71717a; font-weight: bold; border: none; border-bottom: 1px solid rgba(255,255,255,0.05); padding: 12px 8px; }
         """)
 
