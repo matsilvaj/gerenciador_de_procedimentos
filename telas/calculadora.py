@@ -12,6 +12,7 @@ class TelaCalculadora(QWidget):
         super().__init__()
         self.lucro_global_atual = 0.0
         self.media_retornos_atual = 0.0
+        self.duplo_calculado_final = 0.0
         self.last_edited_index = 0
         
         self.casa_fb_pendente = None
@@ -26,6 +27,7 @@ class TelaCalculadora(QWidget):
         
         self.container = QWidget()
         self.container.setStyleSheet("background-color: #09090b;")
+      
         self.layout_container = QVBoxLayout(self.container)
         self.layout_container.setContentsMargins(40, 30, 40, 40)
         self.layout_container.setSpacing(30)
@@ -36,7 +38,7 @@ class TelaCalculadora(QWidget):
 
         self.estilo_geral = """
             QGroupBox { 
-                border: 1px solid rgba(255,255,255,0.05); 
+                border: 1px solid rgba(255,255,255,0.05);
                 border-radius: 12px; 
                 margin-top: 20px; 
                 padding-top: 30px; 
@@ -46,7 +48,7 @@ class TelaCalculadora(QWidget):
             }
             QLabel { color: #a1a1aa; font-weight: normal; font-size: 13px; }
             QLineEdit, QComboBox { 
-                background-color: #18181b; 
+                background-color: #18181b;
                 color: white; 
                 border: 1px solid rgba(255,255,255,0.1); 
                 padding: 10px; 
@@ -56,12 +58,12 @@ class TelaCalculadora(QWidget):
             }
             QLineEdit:focus, QComboBox:focus { border: 1px solid #3b82f6; }
             QPushButton { 
-                background-color: #27272a; 
+                background-color: #27272a;
                 color: white; 
                 border-radius: 6px; 
                 padding: 8px; 
                 font-weight: bold; 
-                border: none; 
+                border: none;
             }
             QPushButton:hover { background-color: #3f3f46; }
         """
@@ -90,6 +92,7 @@ class TelaCalculadora(QWidget):
         lay_sure.setSpacing(15)
 
         lay_seletores = QHBoxLayout()
+       
         vbox_tipo = QVBoxLayout()
         vbox_tipo.addWidget(QLabel("Modelo de Cálculo:"))
         self.combo_modelo = QComboBox()
@@ -113,6 +116,7 @@ class TelaCalculadora(QWidget):
 
         self.container_linhas_sure = QWidget()
         self.layout_linhas = QVBoxLayout(self.container_linhas_sure)
+ 
         self.layout_linhas.setContentsMargins(0, 10, 0, 10)
         self.layout_linhas.setSpacing(10)
         lay_sure.addWidget(self.container_linhas_sure)
@@ -123,6 +127,7 @@ class TelaCalculadora(QWidget):
         
         self.lbl_investimento = QLabel("Custo Efetivo: R$ 0.00")
         self.lbl_retorno = QLabel("Retorno: R$ 0.00")
+        
         self.lbl_lucro_sure = QLabel("Lucro: R$ 0.00 (0%)")
         self.lbl_lucro_sure.setStyleSheet("color: #34d399; font-weight: bold; font-size: 15px;")
         
@@ -136,6 +141,7 @@ class TelaCalculadora(QWidget):
         self.check_duplo.setStyleSheet("color: #a1a1aa; font-weight: bold; font-size: 13px;")
         
         self.btn_limpar = QPushButton("Limpar")
+  
         self.btn_limpar.setStyleSheet("background-color: transparent; color: #f87171; font-weight: bold; padding: 10px 20px; border: 1px solid #f87171; border-radius: 8px;")
         self.btn_limpar.clicked.connect(self.limpar_calculadora)
         
@@ -145,6 +151,7 @@ class TelaCalculadora(QWidget):
         
         lay_acoes.addWidget(self.check_duplo)
         lay_acoes.addStretch()
+   
         lay_acoes.addWidget(self.btn_limpar)
         lay_acoes.addWidget(self.btn_criar_proc)
         
@@ -157,6 +164,7 @@ class TelaCalculadora(QWidget):
         """Muda o estilo do botão ▼ se houver opções avançadas ativas na linha"""
         l = self.linhas_sure[idx]
         tem_algo = bool(l["inp_aum"].text().strip() or l["inp_com"].text().strip() or l["inp_cash"].text().strip() or l["chk_fb"].isChecked())
+   
         sinal = "▲" if l["container_adv"].isVisible() else "▼"
         
         l["btn_adv"].setText(f"{sinal} *" if tem_algo else sinal)
@@ -170,6 +178,7 @@ class TelaCalculadora(QWidget):
         for l in self.linhas_sure:
             estados.append({
                 "odd": l["odd"].text(), "stake": l["stake"].text(), "resp": l["inp_resp"].text(),
+         
                 "tipo": l["btn_tipo"].text(), "aum": l["inp_aum"].text(), "com": l["inp_com"].text(),
                 "cash": l["inp_cash"].text(), "freebet": l["chk_fb"].isChecked(), "adv_vis": l["container_adv"].isVisible()
             })
@@ -179,6 +188,7 @@ class TelaCalculadora(QWidget):
             if w: w.deleteLater()
         self.linhas_sure.clear()
 
+       
         qtd = int(self.combo_qtd.currentText())
         
         header = QWidget()
@@ -190,6 +200,7 @@ class TelaCalculadora(QWidget):
         lbl_h2 = QLabel("Stake / Risco (Lay)")
         lbl_h4 = QLabel("B/L")
         lbl_h4.setFixedWidth(40)
+ 
         lbl_h4.setAlignment(Qt.AlignCenter)
         lbl_h5 = QLabel("")
         lbl_h5.setFixedWidth(35)
@@ -214,6 +225,7 @@ class TelaCalculadora(QWidget):
             m_lay.setContentsMargins(0, 0, 0, 0)
             m_lay.setSpacing(10)
             
+      
             inp_odd = QLineEdit(); inp_odd.setPlaceholderText("Odd")
             
             container_stake = QWidget()
@@ -229,6 +241,7 @@ class TelaCalculadora(QWidget):
             lay_stake.addWidget(inp_stake, 1)
             lay_stake.addWidget(inp_resp, 1)
             
+          
             inp_odd.returnPressed.connect(inp_odd.focusNextChild)
             inp_stake.returnPressed.connect(inp_stake.focusNextChild)
             inp_resp.returnPressed.connect(inp_resp.focusNextChild)
@@ -253,6 +266,7 @@ class TelaCalculadora(QWidget):
             lbl_lucro.setStyleSheet("color: #a1a1aa; font-weight: bold; background-color: #18181b; border-radius: 6px; padding: 8px 15px; font-size: 15px;")
             
             m_lay.addWidget(inp_odd, 2)
+ 
             m_lay.addWidget(container_stake, 4)
             m_lay.addWidget(btn_tipo, 0)
             m_lay.addWidget(btn_adv, 0)
@@ -261,6 +275,7 @@ class TelaCalculadora(QWidget):
             adv_row = QWidget()
             a_lay = QHBoxLayout(adv_row)
             a_lay.setContentsMargins(10, 10, 10, 10)
+      
             adv_row.setStyleSheet("background-color: #18181b; border-radius: 6px;")
             
             lbl_aum = QLabel("Aumento %:"); inp_aum = QLineEdit(); inp_aum.setFixedWidth(60)
@@ -283,10 +298,12 @@ class TelaCalculadora(QWidget):
             self.layout_linhas.addWidget(row_widget)
 
             self.linhas_sure.append({
+    
                 "odd": inp_odd, "stake": inp_stake, "inp_resp": inp_resp, "btn_tipo": btn_tipo, 
                 "lucro_lbl": lbl_lucro, "btn_adv": btn_adv, "container_adv": adv_row,
                 "inp_aum": inp_aum, "inp_com": inp_com, "inp_cash": inp_cash, "chk_fb": chk_fb
             })
+            
             
             def toggle_tipo(checked=False, idx=i):
                 b = self.linhas_sure[idx]["btn_tipo"]
@@ -304,6 +321,7 @@ class TelaCalculadora(QWidget):
 
             def toggle_adv(checked=False, idx=i):
                 c = self.linhas_sure[idx]["container_adv"]
+        
                 if c.isVisible(): c.hide()
                 else: c.show()
                 self.atualizar_indicador_adv(idx)
@@ -317,6 +335,7 @@ class TelaCalculadora(QWidget):
                 inp_aum.setText(e["aum"]); inp_com.setText(e["com"]); inp_cash.setText(e["cash"])
                 chk_fb.setChecked(e["freebet"])
                 if e["tipo"] == "L":
+         
                     btn_tipo.setText("L"); btn_tipo.setStyleSheet("background-color: #ec4899; color: white; border-radius: 6px; font-weight: bold; font-size: 16px;")
                     inp_resp.show()
                 if e["adv_vis"]: adv_row.show()
@@ -325,12 +344,14 @@ class TelaCalculadora(QWidget):
             inp_stake.textEdited.connect(lambda txt, idx=i: self.on_text_edited(idx, "stake"))
             inp_resp.textEdited.connect(lambda txt, idx=i: self.on_text_edited(idx, "resp"))
             
+ 
             for inp in [inp_aum, inp_com, inp_cash]: 
                 inp.textChanged.connect(self.calcular_surebet)
                 inp.textChanged.connect(lambda txt, idx=i: self.atualizar_indicador_adv(idx))
             
             chk_fb.stateChanged.connect(self.calcular_surebet)
             chk_fb.stateChanged.connect(lambda state, idx=i: self.atualizar_indicador_adv(idx))
+         
             
             self.atualizar_indicador_adv(i)
 
@@ -344,6 +365,7 @@ class TelaCalculadora(QWidget):
         
         for idx, l in enumerate(self.linhas_sure):
             l["odd"].setText("")
+    
             l["stake"].setText("")
             l["inp_resp"].setText("")
             l["inp_aum"].setText("")
@@ -352,6 +374,7 @@ class TelaCalculadora(QWidget):
             l["chk_fb"].setChecked(False)
             if l["btn_tipo"].text() == "L":
                 l["btn_tipo"].setText("B")
+ 
                 l["btn_tipo"].setStyleSheet("background-color: #3b82f6; color: white; border-radius: 6px; font-weight: bold; font-size: 16px;")
                 l["inp_resp"].hide()
             self.atualizar_indicador_adv(idx)
@@ -362,6 +385,7 @@ class TelaCalculadora(QWidget):
         
         self.atualizar_linhas_surebet()
         
+   
         for v_inp, o_inp in self.linhas_media:
             v_inp.setText("")
             o_inp.setText("")
@@ -374,6 +398,7 @@ class TelaCalculadora(QWidget):
 
     def sincronizar_campos(self, idx, source):
         l = self.linhas_sure[idx]
+   
         if l["btn_tipo"].text() == "B":
             l["inp_resp"].blockSignals(True); l["inp_resp"].setText(""); l["inp_resp"].blockSignals(False)
             return 
@@ -393,6 +418,7 @@ class TelaCalculadora(QWidget):
                 r_str = l["inp_resp"].text().replace(',', '.')
                 if r_str:
                     r = float(r_str)
+   
                     l["stake"].blockSignals(True)
                     l["stake"].setText(f"{r / (o - 1):.2f}")
                     l["stake"].blockSignals(False)
@@ -401,17 +427,20 @@ class TelaCalculadora(QWidget):
     def calcular_surebet(self):
         for l in self.linhas_sure:
             l["stake"].blockSignals(True)
+ 
             l["inp_resp"].blockSignals(True)
             
         try:
             for l in self.linhas_sure:
                 o_str = l["odd"].text().replace(',', '.')
                 o_raw = float(o_str) if o_str else 0.0
+             
                 aum = float(l["inp_aum"].text().replace(',', '.')) if l["inp_aum"].text() else 0.0
                 com = float(l["inp_com"].text().replace(',', '.')) if l["inp_com"].text() else 0.0
                 cash = float(l["inp_cash"].text().replace(',', '.')) if l["inp_cash"].text() else 0.0
                 is_fb = l["chk_fb"].isChecked()
                 is_lay = l["btn_tipo"].text() == "L"
+      
                 
                 o_eff = 1 + (o_raw - 1) * (1 + aum/100)
                 
@@ -421,20 +450,24 @@ class TelaCalculadora(QWidget):
                     b = (o_eff - 1) * (cash/100)
                 else:
                     if is_fb:
+          
                         M = (o_eff - 1) * (1 - com/100)
                         k = 0 
                         b = 0 
                     else:
+    
                         M = 1 + (o_eff - 1) * (1 - com/100) - (cash/100)
                         k = 1
                         b = cash/100
-                        
+                
+         
                 l["math"] = {"M": M, "k": k, "b": b, "o_eff": o_eff, "is_lay": is_lay}
 
             b_idx = self.last_edited_index
             if b_idx >= len(self.linhas_sure): b_idx = 0
             base_str = self.linhas_sure[b_idx]["stake"].text().replace(',', '.')
             if not base_str: raise Exception("Vazio")
+  
             s_base = float(base_str)
             
             modelo = self.combo_modelo.currentText()
@@ -447,18 +480,22 @@ class TelaCalculadora(QWidget):
                     calc = self.linhas_sure[j]["math"]
                     if calc["M"] > 0: soma_W += (calc["k"] - calc["b"]) / calc["M"]
                 
+           
                 if b_idx == 0:
                     c1 = self.linhas_sure[0]["math"]
                     nr_outros = (s_base * (c1["M"] - (c1["k"] - c1["b"]))) / soma_W if soma_W > 0 else 0
                     for j in range(1, len(self.linhas_sure)):
+          
                         if self.linhas_sure[j]["math"]["M"] > 0: stakes[j] = nr_outros / self.linhas_sure[j]["math"]["M"]
                 else:
                     nr_outros = s_base * self.linhas_sure[b_idx]["math"]["M"]
                     for j in range(1, len(self.linhas_sure)):
+              
                         if j != b_idx and self.linhas_sure[j]["math"]["M"] > 0: stakes[j] = nr_outros / self.linhas_sure[j]["math"]["M"]
                     c1 = self.linhas_sure[0]["math"]
                     num = nr_outros * soma_W
                     den = c1["M"] - (c1["k"] - c1["b"])
+      
                     stakes[0] = num / den if den != 0 else 0
             else:
                 nr_alvo = s_base * self.linhas_sure[b_idx]["math"]["M"]
@@ -471,42 +508,64 @@ class TelaCalculadora(QWidget):
             lucros_brutos = []
             retornos_monetarios = []
             
+            custo_total = 0.0
+            cashback_total = 0.0
+            lucros_brutos = []
+            retornos_monetarios = []
+            lucros_individuais = []
+            
+  
             for i, l in enumerate(self.linhas_sure):
                 c = l["math"]
                 
                 if i == b_idx:
                     s_final = s_base
+           
                 else:
                     if c["is_lay"]: s_final = round(stakes[i], 2)
                     else: s_final = float(int(round(stakes[i])))
                 
                 if i != b_idx: 
+           
                     if c["is_lay"]: l["stake"].setText(f"{s_final:.2f}")
                     else: l["stake"].setText(f"{int(s_final)}")
                     
                 if c["is_lay"]: 
                     l["inp_resp"].setText(f"{s_final * c['o_eff'] - s_final:.2f}")
+      
                 
                 custo = s_final * c["k"]
                 cb = s_final * c["b"]
                 nr = s_final * c["M"]
                 
+              
                 custo_total += custo
                 cashback_total += cb
                 lucros_brutos.append(nr)
-                retornos_monetarios.append(nr + (custo - cb))
+                retornos_monetarios.append(nr)
+                lucros_individuais.append(nr - (custo - cb))
 
             investimento_liquido = custo_total - cashback_total
             lucros_finais = [lb - investimento_liquido for lb in lucros_brutos]
 
+      
             for i, l in enumerate(self.linhas_sure):
                 lf = lucros_finais[i]
                 l["lucro_lbl"].setText(f"R$ {lf:.2f}")
                 cor = "#34d399" if lf > 0 else ("#f87171" if lf < 0 else "#a1a1aa")
                 l["lucro_lbl"].setStyleSheet(f"color: {cor}; font-weight: bold; background-color: #18181b; border-radius: 6px; padding: 8px 15px; font-size: 15px;")
                 
-            self.media_retornos_atual = sum(retornos_monetarios) / len(retornos_monetarios) if retornos_monetarios else 0.0
+            # 1. Cálculo da Média de Lucro/Perda Simples (Padrão)
+            self.media_retornos_atual = sum(lucros_finais) / len(lucros_finais) if lucros_finais else 0.0
             
+            if len(lucros_individuais) >= 2:
+                lucros_ind_ordenados = sorted(lucros_individuais, reverse=True)
+                valor_do_duplo = lucros_ind_ordenados[0] + lucros_ind_ordenados[1]
+            else:
+                valor_do_duplo = self.media_retornos_atual
+
+            self.duplo_calculado_final = valor_do_duplo
+
             if "0x0" in modelo:
                 lg = lucros_finais[1] if len(lucros_finais) > 1 else 0
                 ret_padrao = retornos_monetarios[1] if len(retornos_monetarios) > 1 else 0
@@ -527,6 +586,7 @@ class TelaCalculadora(QWidget):
         finally:
             for l in self.linhas_sure:
                 l["stake"].blockSignals(False)
+           
                 l["inp_resp"].blockSignals(False)
 
     def abrir_modal_procedimento(self):
@@ -535,30 +595,38 @@ class TelaCalculadora(QWidget):
                 QMessageBox.warning(self, "Aviso", "Preencha primeiro a sua Entrada Base e as Odds.")
                 return
                 
+          
             lucro_base = getattr(self, 'lucro_global_atual', 0.0)
             media_retornos = getattr(self, 'media_retornos_atual', 0.0)
             is_duplo = self.check_duplo.isChecked()
+            v_duplo_final = getattr(self, 'duplo_calculado_final', 0.0) if is_duplo else 0.0
             
             tipo = "Converter Freebet" if self.casa_fb_pendente else ('Tentativa de Duplo' if is_duplo else 'SureBet')
             casa_sugerida = self.casa_fb_pendente if self.casa_fb_pendente else 'Nenhuma selecionada'
+        
             
             d = {
                 'tipo': tipo,
-                'jogo': '', 'casas': casa_sugerida,
+                'jogo': '', 
+                'casas': casa_sugerida,
                 'lucro_base': round(lucro_base, 2),
-                'v_duplo': round(media_retornos, 2) if is_duplo else 0.0,
-                'obs': '', 'condicao': '', 'casa_fb': self.casa_fb_pendente if self.casa_fb_pendente else ''
+                'v_duplo': round(v_duplo_final, 2),
+                'obs': f"Média P/L: R$ {media_retornos:.2f}" if is_duplo else '',
+                'condicao': '', 
+                'casa_fb': self.casa_fb_pendente if self.casa_fb_pendente else ''
             }
             
             dialog = DialogNovoProcedimento(self, dados_edicao=d)
             if dialog.exec() == QDialog.Accepted:
                 if self.ids_fb_pendente:
+          
                     database.salvar_conversao_freebet(dialog.dados_finais, self.ids_fb_pendente)
                     self.casa_fb_pendente = None
                     self.ids_fb_pendente = None
                 else:
                     database.salvar_procedimento(dialog.dados_finais)
-                    
+         
+                
                 QMessageBox.information(self, "Sucesso", "Procedimento salvo com sucesso!\nEle já aparecerá na aba de Procedimentos.")
         except Exception:
             QMessageBox.warning(self, "Erro", "Houve um problema ao criar o procedimento. Verifique os valores.")
@@ -573,6 +641,7 @@ class TelaCalculadora(QWidget):
         btn_add = QPushButton("+ Adicionar Aposta")
         btn_add.setFixedWidth(200)
         btn_add.clicked.connect(self.add_linha_media)
+      
         lay_media.addWidget(btn_add)
         self.lbl_res_media = QLabel("Odd Média: 0.00")
         self.lbl_res_media.setStyleSheet("color: #3b82f6; font-size: 18px; font-weight: bold; margin-top: 15px;")
@@ -584,6 +653,7 @@ class TelaCalculadora(QWidget):
     def add_linha_media(self):
         row = len(self.linhas_media) + 1
         if row == 1:
+        
             self.grid_media.addWidget(QLabel("Valor (R$)"), 0, 0)
             self.grid_media.addWidget(QLabel("Odd"), 0, 1)
         inp_val = QLineEdit(); inp_val.setPlaceholderText("Valor"); inp_val.returnPressed.connect(inp_val.focusNextChild)
@@ -600,4 +670,4 @@ class TelaCalculadora(QWidget):
                 o = float(o_inp.text().replace(',', '.')) if o_inp.text() else 0
                 soma_prod += (v * o); soma_val += v
             self.lbl_res_media.setText(f"Odd Média: {soma_prod / soma_val:.2f}" if soma_val > 0 else "Odd Média: 0.00")
-        except: pass
+        except: pass 
