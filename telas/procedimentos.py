@@ -326,7 +326,7 @@ class DialogNovoProcedimento(QDialog):
         lay_cfb.setContentsMargins(0, 0, 0, 0)
         lay_cfb.addWidget(self.lbl_casa_freebet, stretch=1); lay_cfb.addWidget(self.btn_escolher_casa_fb)
 
-        self.layout_detalhes.addRow("Jogo/Time:", self.input_jogo)
+        self.layout_detalhes.addRow("Jogo:", self.input_jogo)
         self.layout_detalhes.addRow("Condição FB:", self.combo_condicao)
         self.layout_detalhes.addRow("Casa da FB:", self.container_casa_fb)
         self.grupo_detalhes.setLayout(self.layout_detalhes)
@@ -361,8 +361,8 @@ class DialogNovoProcedimento(QDialog):
         self.layout_valores.addRow("Valor Duplo (R$):", self.input_valor_duplo)
         self.layout_valores.addRow("Valor da Freebet (R$):", self.input_valor_freebet)
         self.layout_valores.addRow("", self.check_lucro_igual)
-        self.layout_valores.addRow("Entrada principal:", self.input_entrada)
-        self.adicionar_campo_protecao(texto_padrao="Proteção 1:", eh_padrao=True)
+        self.layout_valores.addRow("Lucro da Entrada:", self.input_entrada)
+        self.adicionar_campo_protecao(texto_padrao="Lucro da Proteção:", eh_padrao=True)
         self.layout_valores.addRow("", self.btn_add_protecao)
         grupo_valores.setLayout(self.layout_valores)
         self.layout_principal.addWidget(grupo_valores)
@@ -780,9 +780,16 @@ class TelaProcedimentos(QWidget):
                 'mes_referencia': self.ultimo_excluido[10],
                 'casa_destino_freebet': self.ultimo_excluido[11] if len(self.ultimo_excluido) > 11 else "",
                 'status_freebet': self.ultimo_excluido[12] if len(self.ultimo_excluido) > 12 else "N/A",
-                'valor_da_freebet': self.ultimo_excluido[14] if len(self.ultimo_excluido) > 14 else 0.0
+                'valor_da_freebet': self.ultimo_excluido[14] if len(self.ultimo_excluido) > 14 else 0.0,
+                'ganhou_freebet': self.ultimo_excluido[15] if len(self.ultimo_excluido) > 15 else ""
             }
             database.salvar_procedimento(dados)
             self.ultimo_excluido = None
             self.btn_desfazer.hide()
             self.carregar_tabela()
+
+    def desfazer_ultima_acao(self):
+        if not self.ultimo_excluido:
+            return False
+        self.restaurar_excluido()
+        return True

@@ -3,11 +3,13 @@ from PySide6.QtWidgets import (
     QGroupBox, QGridLayout, QPushButton, QComboBox, 
     QScrollArea, QFrame, QCheckBox, QDialog, QMessageBox
 )
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Signal
 from telas.procedimentos import DialogNovoProcedimento
 from core import database
 
 class TelaCalculadora(QWidget):
+    sinal_conversao_freebet_salva = Signal(object)
+
     def __init__(self):
         super().__init__()
         self.lucro_global_atual = 0.0
@@ -630,8 +632,13 @@ class TelaCalculadora(QWidget):
             dialog = DialogNovoProcedimento(self, dados_edicao=d)
             if dialog.exec() == QDialog.Accepted:
                 if self.ids_fb_pendente:
-          
-                    database.salvar_conversao_freebet(dialog.dados_finais, self.ids_fb_pendente)
+                    ids_origem = list(self.ids_fb_pendente) if isinstance(self.ids_fb_pendente, list) else [self.ids_fb_pendente]
+                    estados_origem = database.buscar_estados_freebets(ids_origem)
+                    id_conversao = database.salvar_conversao_freebet(dialog.dados_finais, self.ids_fb_pendente)
+                    self.sinal_conversao_freebet_salva.emit({
+                        'id_conversao': id_conversao,
+                        'estados_origem': estados_origem
+                    })
                     self.casa_fb_pendente = None
                     self.ids_fb_pendente = None
                 else:

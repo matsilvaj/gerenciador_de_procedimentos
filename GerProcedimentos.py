@@ -10,7 +10,7 @@ from telas.freebets import TelaFreebets
 from telas.casas_apostas import TelaCasasApostas
 from telas.calculadora import TelaCalculadora
 from core import database
-from PySide6.QtGui import QIcon
+from PySide6.QtGui import QIcon, QKeySequence, QShortcut
 
 database.criar_tabelas()
 database.atualizar_schema()
@@ -82,6 +82,10 @@ class MainWindow(QMainWindow):
 
         # Conecta o sinal da aba de freebets para enviar as informações para a calculadora
         self.tela_freebets.sinal_converter_calculadora.connect(self.ir_para_calculadora_com_freebet)
+        self.tela_calculadora.sinal_conversao_freebet_salva.connect(self.tela_freebets.registrar_conversao_salva)
+
+        self.shortcut_desfazer = QShortcut(QKeySequence.Undo, self)
+        self.shortcut_desfazer.activated.connect(self.desfazer_acao_atual)
 
         self.aplicar_estilo()
         self.mudar_tela(self.btn_dashboard, self.tela_dashboard)
@@ -129,6 +133,11 @@ class MainWindow(QMainWindow):
         elif tela_alvo == self.tela_freebets: self.tela_freebets.carregar_freebets_ativas()
         elif tela_alvo == self.tela_casas: self.tela_casas.atualizar_dados()
         elif tela_alvo == self.tela_historico: self.tela_historico.atualizar_lista_meses()
+
+    def desfazer_acao_atual(self):
+        tela_atual = self.telas.currentWidget()
+        if hasattr(tela_atual, "desfazer_ultima_acao"):
+            tela_atual.desfazer_ultima_acao()
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

@@ -50,6 +50,8 @@ def atualizar_schema():
         cursor.execute("ALTER TABLE Procedimentos_Historico ADD COLUMN id_freebet_origem INTEGER")
     if 'valor_da_freebet' not in colunas:
         cursor.execute("ALTER TABLE Procedimentos_Historico ADD COLUMN valor_da_freebet REAL DEFAULT 0.0")
+    if 'ganhou_freebet' not in colunas:
+        cursor.execute("ALTER TABLE Procedimentos_Historico ADD COLUMN ganhou_freebet TEXT DEFAULT ''")
         
     cursor.execute("PRAGMA table_info(Casas_de_Apostas)")
     colunas_casas = [col[1] for col in cursor.fetchall()]
@@ -77,6 +79,7 @@ def salvar_conversao_freebet(dados, ids_freebet_origem):
         id_referencia, dados.get('casa_destino_freebet', ''), dados.get('valor_da_freebet', 0.0)
     )
     cursor.execute(query, valores)
+    id_conversao = cursor.lastrowid
     
     if isinstance(ids_freebet_origem, list):
         for id_op in ids_freebet_origem:
@@ -86,6 +89,7 @@ def salvar_conversao_freebet(dados, ids_freebet_origem):
     
     conexao.commit()
     conexao.close()
+    return id_conversao
 
 if __name__ == "__main__":
     criar_tabelas()
@@ -118,15 +122,16 @@ def salvar_procedimento(dados):
     INSERT INTO Procedimentos_Historico (
         data_operacao, tipo_procedimento, casas_envolvidas, jogo_time_pa,
         lucro_final, bateu_duplo, condicao_freebet, valor_freebet_coletada, 
-        observacao, mes_referencia, casa_destino_freebet, status_freebet, valor_da_freebet
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        observacao, mes_referencia, casa_destino_freebet, status_freebet, valor_da_freebet,
+        ganhou_freebet
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """
     valores = (
         dados.get('data_operacao'), dados.get('tipo_procedimento'), dados.get('casas_envolvidas'),
         dados.get('jogo_time_pa'), dados.get('lucro_final'), dados.get('bateu_duplo'),
         dados.get('condicao_freebet'), dados.get('valor_freebet_coletada'), dados.get('observacao'),
         dados.get('mes_referencia'), dados.get('casa_destino_freebet', ''), dados.get('status_freebet', 'N/A'),
-        dados.get('valor_da_freebet', 0.0)
+        dados.get('valor_da_freebet', 0.0), dados.get('ganhou_freebet', '')
     )
     cursor.execute(query, valores)
     conexao.commit()
@@ -136,6 +141,67 @@ def atualizar_status_duplo(id_procedimento, bateu):
     conexao = conectar()
     cursor = conexao.cursor()
     cursor.execute("UPDATE Procedimentos_Historico SET bateu_duplo = ? WHERE id = ?", (bateu, id_procedimento))
+    conexao.commit()
+    conexao.close()
+
+def atualizar_resultado_freebet(id_procedimento, resultado):
+    conexao = conectar()
+    cursor = conexao.cursor()
+    status = 'Finalizada' if resultado == 'N\u00e3o' else 'Pendente'
+    cursor.execute(
+        "UPDATE Procedimentos_Historico SET ganhou_freebet = ?, status_freebet = ? WHERE id = ?",
+        (resultado, status, id_procedimento)
+    )
+    conexao.commit()
+    conexao.close()
+
+def buscar_estado_freebet(id_procedimento):
+    conexao = conectar()
+    cursor = conexao.cursor()
+    cursor.execute(
+        "SELECT id, ganhou_freebet, status_freebet FROM Procedimentos_Historico WHERE id = ?",
+        (id_procedimento,)
+    )
+    linha = cursor.fetchone()
+    conexao.close()
+    if not linha:
+        return None
+    return {
+        'id': linha[0],
+        'ganhou_freebet': linha[1] or '',
+        'status_freebet': linha[2] or 'N/A'
+    }
+
+def buscar_estados_freebets(ids_procedimento):
+    if isinstance(ids_procedimento, int):
+        ids_procedimento = [ids_procedimento]
+
+    estados = []
+    for id_procedimento in ids_procedimento:
+        estado = buscar_estado_freebet(id_procedimento)
+        if estado:
+            estados.append(estado)
+    return estados
+
+def restaurar_estado_freebet(id_procedimento, ganhou_freebet, status_freebet):
+    conexao = conectar()
+    cursor = conexao.cursor()
+    cursor.execute(
+        "UPDATE Procedimentos_Historico SET ganhou_freebet = ?, status_freebet = ? WHERE id = ?",
+        (ganhou_freebet, status_freebet, id_procedimento)
+    )
+    conexao.commit()
+    conexao.close()
+
+def desfazer_conversao_freebet(id_conversao, estados_origem):
+    conexao = conectar()
+    cursor = conexao.cursor()
+    cursor.execute("DELETE FROM Procedimentos_Historico WHERE id = ?", (id_conversao,))
+    for estado in estados_origem:
+        cursor.execute(
+            "UPDATE Procedimentos_Historico SET ganhou_freebet = ?, status_freebet = ? WHERE id = ?",
+            (estado.get('ganhou_freebet', ''), estado.get('status_freebet', 'Pendente'), estado['id'])
+        )
     conexao.commit()
     conexao.close()
     
