@@ -86,7 +86,7 @@ class TelaCalculadora(QWidget):
             self.calcular_surebet()
 
     def setup_secao_surebet(self):
-        grupo_sure = QGroupBox("Calculadora de Arbitragem Avançada")
+        grupo_sure = QGroupBox("Calculadora Surebet")
         grupo_sure.setStyleSheet(self.estilo_geral)
         lay_sure = QVBoxLayout(grupo_sure)
         lay_sure.setSpacing(15)
@@ -97,7 +97,7 @@ class TelaCalculadora(QWidget):
         vbox_tipo.addWidget(QLabel("Modelo de Cálculo:"))
         self.combo_modelo = QComboBox()
         self.combo_modelo.setFixedWidth(200)
-        self.combo_modelo.addItems(["Surebet Padrão", "Surebet 0x0 (Empate Lado 1)"])
+        self.combo_modelo.addItems(["Surebet Padrão", "Surebet 0x0"])
         self.combo_modelo.currentIndexChanged.connect(self.calcular_surebet)
         vbox_tipo.addWidget(self.combo_modelo)
         
@@ -137,7 +137,7 @@ class TelaCalculadora(QWidget):
         lay_sure.addWidget(self.frame_res)
 
         lay_acoes = QHBoxLayout()
-        self.check_duplo = QCheckBox("Possibilidade de Duplo Green (Média dos Retornos)")
+        self.check_duplo = QCheckBox("Possibilidade de Duplo Green")
         self.check_duplo.setStyleSheet("color: #a1a1aa; font-weight: bold; font-size: 13px;")
         
         self.btn_limpar = QPushButton("Limpar")
@@ -167,7 +167,7 @@ class TelaCalculadora(QWidget):
    
         sinal = "▲" if l["container_adv"].isVisible() else "▼"
         
-        l["btn_adv"].setText(f"{sinal} *" if tem_algo else sinal)
+        l["btn_adv"].setText(f"{sinal}" if tem_algo else sinal)
         if tem_algo:
             l["btn_adv"].setStyleSheet("background-color: rgba(59, 130, 246, 0.1); color: #3b82f6; font-size: 12px; border: 1px solid #3b82f6; border-radius: 6px; font-weight: bold;")
         else:
@@ -197,14 +197,14 @@ class TelaCalculadora(QWidget):
         h_lay.setSpacing(10)
         
         lbl_h1 = QLabel("Odd")
-        lbl_h2 = QLabel("Stake / Risco (Lay)")
-        lbl_h4 = QLabel("B/L")
+        lbl_h2 = QLabel("Stake")
+        lbl_h4 = QLabel("")
         lbl_h4.setFixedWidth(40)
  
         lbl_h4.setAlignment(Qt.AlignCenter)
         lbl_h5 = QLabel("")
         lbl_h5.setFixedWidth(35)
-        lbl_h6 = QLabel("Lucro Líquido")
+        lbl_h6 = QLabel("Lucro")
         lbl_h6.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
         
         h_lay.addWidget(lbl_h1, 2)
@@ -226,7 +226,7 @@ class TelaCalculadora(QWidget):
             m_lay.setSpacing(10)
             
       
-            inp_odd = QLineEdit(); inp_odd.setPlaceholderText("Odd")
+            inp_odd = QLineEdit(); inp_odd.setPlaceholderText("")
             
             container_stake = QWidget()
             lay_stake = QHBoxLayout(container_stake)
@@ -234,7 +234,7 @@ class TelaCalculadora(QWidget):
             lay_stake.setSpacing(10)
             
             inp_stake = QLineEdit()
-            inp_resp = QLineEdit(); inp_resp.setPlaceholderText("Risco (Lay)")
+            inp_resp = QLineEdit(); inp_resp.setPlaceholderText("Responsabilidade")
             inp_resp.setStyleSheet("color: #ec4899; font-weight: bold; background-color: rgba(236, 72, 153, 0.05); border: 1px solid rgba(236, 72, 153, 0.2);")
             inp_resp.hide()
             
@@ -247,9 +247,9 @@ class TelaCalculadora(QWidget):
             inp_resp.returnPressed.connect(inp_resp.focusNextChild)
 
             if i == 0:
-                inp_stake.setPlaceholderText("Sua Stake")
+                inp_stake.setPlaceholderText("")
             else:
-                inp_stake.setPlaceholderText("Stake Auto")
+                inp_stake.setPlaceholderText("")
 
             btn_tipo = QPushButton("B")
             btn_tipo.setFixedSize(40, 40)
@@ -390,6 +390,16 @@ class TelaCalculadora(QWidget):
             v_inp.setText("")
             o_inp.setText("")
         self.calcular_media()
+
+        # --- NOVO CÓDIGO AQUI ---
+        self.lbl_investimento.setText("Custo Efetivo: R$ 0.00")
+        self.lbl_retorno.setText("Retorno: R$ 0.00")
+        self.lbl_lucro_sure.setText("Lucro: R$ 0.00 (0%)")
+        self.lbl_lucro_sure.setStyleSheet("color: #34d399; font-weight: bold; font-size: 15px;")
+        
+        self.lucro_global_atual = 0.0
+        self.media_retornos_atual = 0.0
+        self.duplo_calculado_final = 0.0
 
     def on_text_edited(self, idx, source):
         if source in ["stake", "resp"]: self.last_edited_index = idx
@@ -555,17 +565,18 @@ class TelaCalculadora(QWidget):
                 cor = "#34d399" if lf > 0 else ("#f87171" if lf < 0 else "#a1a1aa")
                 l["lucro_lbl"].setStyleSheet(f"color: {cor}; font-weight: bold; background-color: #18181b; border-radius: 6px; padding: 8px 15px; font-size: 15px;")
                 
-            # 1. Cálculo da Média de Lucro/Perda Simples (Padrão)
-            self.media_retornos_atual = sum(lucros_finais) / len(lucros_finais) if lucros_finais else 0.0
+           # Filtra apenas as linhas que foram realmente preenchidas com odds e investimentos (M > 0)
+            lucros_finais_validos = [lf for i, lf in enumerate(lucros_finais) if self.linhas_sure[i]["math"]["M"] > 0]
+            retornos_validos = [rm for i, rm in enumerate(retornos_monetarios) if self.linhas_sure[i]["math"]["M"] > 0]
             
-            if len(lucros_individuais) >= 2:
-                lucros_ind_ordenados = sorted(lucros_individuais, reverse=True)
-                valor_do_duplo = lucros_ind_ordenados[0] + lucros_ind_ordenados[1]
+            # 1. Cálculo da Média de Lucro/Perda Simples (Padrão)
+            self.media_retornos_atual = sum(lucros_finais_validos) / len(lucros_finais_validos) if lucros_finais_validos else 0.0
+            
+            # 2. Cálculo do Duplo Green (Média total dos retornos válidos)
+            if retornos_validos:
+                self.duplo_calculado_final = sum(retornos_validos) / len(retornos_validos)
             else:
-                valor_do_duplo = self.media_retornos_atual
-
-            self.duplo_calculado_final = valor_do_duplo
-
+                self.duplo_calculado_final = 0.0
             if "0x0" in modelo:
                 lg = lucros_finais[1] if len(lucros_finais) > 1 else 0
                 ret_padrao = retornos_monetarios[1] if len(retornos_monetarios) > 1 else 0
@@ -611,7 +622,7 @@ class TelaCalculadora(QWidget):
                 'casas': casa_sugerida,
                 'lucro_base': round(lucro_base, 2),
                 'v_duplo': round(v_duplo_final, 2),
-                'obs': f"Média P/L: R$ {media_retornos:.2f}" if is_duplo else '',
+                'obs': '',
                 'condicao': '', 
                 'casa_fb': self.casa_fb_pendente if self.casa_fb_pendente else ''
             }
@@ -651,16 +662,76 @@ class TelaCalculadora(QWidget):
         self.layout_container.addWidget(grupo_media)
 
     def add_linha_media(self):
-        row = len(self.linhas_media) + 1
-        if row == 1:
+        # Usamos o rowCount para garantir que as linhas não se sobreponham caso você apague e adicione novamente
+        row_idx = self.grid_media.rowCount() 
         
+        if len(self.linhas_media) == 0:
             self.grid_media.addWidget(QLabel("Valor (R$)"), 0, 0)
             self.grid_media.addWidget(QLabel("Odd"), 0, 1)
-        inp_val = QLineEdit(); inp_val.setPlaceholderText("Valor"); inp_val.returnPressed.connect(inp_val.focusNextChild)
-        inp_odd = QLineEdit(); inp_odd.setPlaceholderText("Odd"); inp_odd.returnPressed.connect(inp_odd.focusNextChild)
-        inp_val.textChanged.connect(self.calcular_media); inp_odd.textChanged.connect(self.calcular_media)
-        self.grid_media.addWidget(inp_val, row, 0); self.grid_media.addWidget(inp_odd, row, 1)
-        self.linhas_media.append((inp_val, inp_odd))
+            self.grid_media.addWidget(QLabel(""), 0, 2)
+            row_idx = 1  # Força a primeira linha de dados a ficar na posição logo abaixo dos textos
+
+        inp_val = QLineEdit()
+        inp_val.setPlaceholderText("Valor")
+        inp_val.returnPressed.connect(inp_val.focusNextChild)
+        
+        inp_odd = QLineEdit()
+        inp_odd.setPlaceholderText("Odd")
+        inp_odd.returnPressed.connect(inp_odd.focusNextChild)
+        
+        inp_val.textChanged.connect(self.calcular_media)
+        inp_odd.textChanged.connect(self.calcular_media)
+        
+        self.grid_media.addWidget(inp_val, row_idx, 0)
+        self.grid_media.addWidget(inp_odd, row_idx, 1)
+        
+        row_data = {"val": inp_val, "odd": inp_odd, "btn": None}
+        
+        # --- A MÁGICA ACONTECE AQUI ---
+        # Só cria o botão "-" se já existirem 2 ou mais linhas (ou seja, da 3ª em diante)
+        if len(self.linhas_media) >= 2:
+            btn_del = QPushButton("-")
+            btn_del.setFixedSize(30, 30)
+            btn_del.setCursor(Qt.PointingHandCursor)
+            btn_del.setStyleSheet("""
+                QPushButton {
+                    background-color: rgba(248, 113, 113, 0.1); 
+                    color: #f87171; 
+                    border: 1px solid rgba(248, 113, 113, 0.2); 
+                    border-radius: 4px; 
+                    font-weight: bold;
+                    font-size: 18px;
+                }
+                QPushButton:hover {
+                    background-color: rgba(248, 113, 113, 0.2);
+                }
+            """)
+            self.grid_media.addWidget(btn_del, row_idx, 2)
+            row_data["btn"] = btn_del
+            
+            # Conecta a função de remover apenas se o botão existir
+            btn_del.clicked.connect(lambda: self.remover_linha_media(row_data))
+            
+        self.linhas_media.append(row_data)
+        
+    def remover_linha_media(self, row_data):
+        # Segurança extra: se a linha não tem botão (as duas primeiras), cancela a remoção
+        if row_data["btn"] is None:
+            return
+            
+        # Remove os elementos do layout da tela
+        self.grid_media.removeWidget(row_data["val"])
+        self.grid_media.removeWidget(row_data["odd"])
+        self.grid_media.removeWidget(row_data["btn"])
+        
+        # Elimina os widgets da memória
+        row_data["val"].deleteLater()
+        row_data["odd"].deleteLater()
+        row_data["btn"].deleteLater()
+        
+        # Remove da lista de cálculos e atualiza a média
+        self.linhas_media.remove(row_data)
+        self.calcular_media()
 
     def calcular_media(self):
         soma_prod = 0; soma_val = 0

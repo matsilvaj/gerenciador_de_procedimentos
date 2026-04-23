@@ -1,5 +1,5 @@
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
-                               QTableWidget, QTableWidgetItem, QHeaderView, QPushButton, QTabWidget, QDialog)
+                               QTableWidget, QTableWidgetItem, QHeaderView, QPushButton, QTabWidget)
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QColor, QBrush
 from core import database
@@ -30,6 +30,7 @@ class TelaFreebets(QWidget):
             QTabBar::tab:selected { color: #3b82f6; }
         """)
 
+        # ABA 1: DISPONÍVEIS
         aba_disponiveis = QWidget()
         layout_disp = QVBoxLayout(aba_disponiveis)
         layout_disp.setContentsMargins(0,0,0,0)
@@ -39,12 +40,13 @@ class TelaFreebets(QWidget):
         layout_disp.addWidget(self.tab_ativas)
         self.abas.addTab(aba_disponiveis, "Disponíveis")
 
+        # ABA 2: HISTÓRICO
         aba_convertidas = QWidget()
         layout_conv = QVBoxLayout(aba_convertidas)
         layout_conv.setContentsMargins(0,0,0,0)
         self.tab_convertidas = TabelaProcedimentos(0, 6)
         self.tab_convertidas.setHorizontalHeaderLabels(["Data (Col ➔ Conv)", "Casa", "Valor FB", "Lucro Base", "Lucro Final", "Total"])
-        self.configurar_tabela(self.tab_convertidas)
+        self.configurar_tabela(self.tab_convertidas) # Sem ação de botões extras
         layout_conv.addWidget(self.tab_convertidas)
         self.abas.addTab(aba_convertidas, "Histórico")
 
@@ -53,15 +55,15 @@ class TelaFreebets(QWidget):
     def configurar_tabela(self, tabela, tem_acao=False):
         tabela.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         if tem_acao:
-            tabela.horizontalHeader().setSectionResizeMode(4, QHeaderView.Fixed)
-            tabela.setColumnWidth(4, 90)
+            ultima_coluna = tabela.columnCount() - 1
+            tabela.horizontalHeader().setSectionResizeMode(ultima_coluna, QHeaderView.Fixed)
+            tabela.setColumnWidth(ultima_coluna, 90)
 
         tabela.verticalHeader().setVisible(False)
         tabela.verticalHeader().setDefaultSectionSize(75)
         tabela.setEditTriggers(QTableWidget.NoEditTriggers) 
         tabela.setSelectionBehavior(QTableWidget.SelectRows)
         tabela.setSelectionMode(QTableWidget.NoSelection)
-        
         tabela.setFocusPolicy(Qt.NoFocus)
         tabela.setShowGrid(False)
         tabela.setMouseTracking(True)
@@ -126,6 +128,7 @@ class TelaFreebets(QWidget):
     def carregar_freebets_convertidas(self):
         self.tab_convertidas.setRowCount(0)
         conexao = database.conectar(); cursor = conexao.cursor()
+        
         cursor.execute("""
             SELECT c.data_operacao, v.data_operacao, c.casa_destino_freebet, c.valor_da_freebet, c.lucro_final, c.bateu_duplo, c.valor_freebet_coletada, v.lucro_final, v.valor_da_freebet, v.bateu_duplo, v.valor_freebet_coletada
             FROM Procedimentos_Historico c INNER JOIN Procedimentos_Historico v ON v.id_freebet_origem = c.id
@@ -157,4 +160,5 @@ class TelaFreebets(QWidget):
             self.tab_convertidas.setItem(row, 3, item(f"R$ {lucro_col_real:.2f}", COR_VERDE if lucro_col_real >= 0 else COR_VERMELHO))
             self.tab_convertidas.setItem(row, 4, item(f"R$ {lucro_conv_real:.2f}", COR_VERDE if lucro_conv_real >= 0 else COR_VERMELHO))
             self.tab_convertidas.setItem(row, 5, item(f"R$ {lucro_total:.2f}", COR_VERDE if lucro_total >= 0 else COR_VERMELHO, bold=True))
+
         conexao.close()

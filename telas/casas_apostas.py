@@ -52,6 +52,7 @@ class TelaCasasApostas(QWidget):
         
         self.container_grid = QWidget()
         self.container_grid.setStyleSheet("background-color: transparent;")
+        self.container_grid.setSizePolicy(self.container_grid.sizePolicy().Policy.Expanding, self.container_grid.sizePolicy().Policy.Fixed)
         
         self.grid_lay = QGridLayout(self.container_grid)
         self.grid_lay.setSpacing(15)

@@ -108,31 +108,71 @@ class DialogEscolherCasas(QDialog):
         for i in reversed(range(self.layout_checks.count())):
             widget = self.layout_checks.itemAt(i).widget()
             if widget: widget.deleteLater()
-        self.checkboxes.clear(); self.botoes_deletar.clear()
+        self.checkboxes.clear()
+        self.botoes_deletar.clear()
 
-        casas = database.listar_casas()
+        # Adiciona forçamento de tamanho para o scroll funcionar
+        from PySide6.QtWidgets import QSizePolicy
+        self.scroll_content.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+
+        # 1. Pega todas as casas e as casas do histórico para descobrir o Top 10
+        todas_casas = database.listar_casas()
+        conexao = database.conectar()
+        cursor = conexao.cursor()
+        cursor.execute("SELECT casas_envolvidas, casa_destino_freebet FROM Procedimentos_Historico")
+        
+        frequencia = {c: 0 for c in todas_casas}
+        for casas_env, casa_dest in cursor.fetchall():
+            if casas_env:
+                for c in casas_env.split(" | "):
+                    if c in frequencia: frequencia[c] += 1
+            if casa_dest and casa_dest in frequencia:
+                frequencia[casa_dest] += 1
+        conexao.close()
+
+        # Ordena as casas pelas mais usadas (Top 10)
+        casas_ordenadas = sorted(todas_casas, key=lambda x: frequencia.get(x, 0), reverse=True)
+        top_9 = casas_ordenadas[:9]
+        restantes = sorted(casas_ordenadas[9:]) # O restante em ordem alfabética
+
         row, col = 0, 0
-        for casa in casas:
-            if filtro.lower() in casa.lower():
-                container_casa = QWidget()
-                lay_casa = QHBoxLayout(container_casa)
-                lay_casa.setContentsMargins(0, 0, 0, 0)
-                
-                chk = QCheckBox(casa)
-                if casa in self.casas_selecionadas: chk.setChecked(True)
-                
-                btn_del = QPushButton("-")
-                btn_del.setFixedSize(24, 24)
-                btn_del.setStyleSheet(f"color: {COR_VERMELHO}; background: #27272a; border-radius: 6px;")
-                btn_del.clicked.connect(lambda _, c=casa: self.deletar_casa(c))
-                btn_del.setVisible(self.modo_exclusao) 
-                self.botoes_deletar.append(btn_del)
-                
-                lay_casa.addWidget(chk); lay_casa.addWidget(btn_del); lay_casa.addStretch() 
-                self.layout_checks.addWidget(container_casa, row, col)
-                self.checkboxes[casa] = chk
-                col += 1
-                if col > 2: col = 0; row += 1
+        
+        def renderizar_grupo(titulo, lista_casas):
+            nonlocal row, col
+            if not lista_casas: return
+            
+            lbl_titulo = QLabel(titulo)
+            lbl_titulo.setStyleSheet("color: #3b82f6; font-weight: bold; margin-top: 10px; margin-bottom: 5px;")
+            self.layout_checks.addWidget(lbl_titulo, row, 0, 1, 3)
+            row += 1; col = 0
+            
+            for casa in lista_casas:
+                if filtro.lower() in casa.lower():
+                    container_casa = QWidget()
+                    lay_casa = QHBoxLayout(container_casa)
+                    lay_casa.setContentsMargins(0, 0, 0, 0)
+                    
+                    chk = QCheckBox(casa)
+                    if casa in self.casas_selecionadas: chk.setChecked(True)
+                    
+                    btn_del = QPushButton("-")
+                    btn_del.setFixedSize(24, 24)
+                    btn_del.setStyleSheet(f"color: #f87171; background: #27272a; border-radius: 6px;")
+                    btn_del.clicked.connect(lambda _, c=casa: self.deletar_casa(c))
+                    btn_del.setVisible(self.modo_exclusao) 
+                    self.botoes_deletar.append(btn_del)
+                    
+                    lay_casa.addWidget(chk); lay_casa.addWidget(btn_del); lay_casa.addStretch() 
+                    self.layout_checks.addWidget(container_casa, row, col)
+                    self.checkboxes[casa] = chk
+                    
+                    col += 1
+                    if col > 2: col = 0; row += 1
+            if col != 0: row += 1; col = 0
+
+        # Renderiza os dois grupos
+        renderizar_grupo("Mais Usadas", top_9)
+        renderizar_grupo("Todas as Casas", restantes)
 
     def sync_selecionadas(self):
         for casa, chk in self.checkboxes.items():
@@ -583,6 +623,25 @@ class TelaProcedimentos(QWidget):
         
         self.tabela.setShowGrid(False)
         self.tabela.setFocusPolicy(Qt.NoFocus)
+        
+        self.ultimo_excluido = None
+        
+        self.btn_desfazer = QPushButton("↶ Desfazer exclusão")
+        self.btn_desfazer.setCursor(Qt.PointingHandCursor)
+        self.btn_desfazer.setStyleSheet("""
+            QPushButton {
+                background-color: transparent; 
+                color: #71717a; /* Cinza escuro sutil */
+                font-weight: bold; 
+                font-size: 13px;
+                border: none;
+            }
+            QPushButton:hover {
+                color: #a1a1aa; /* Fica levemente mais claro no hover */
+            }
+        """)
+        self.btn_desfazer.clicked.connect(self.restaurar_excluido)
+        self.btn_desfazer.hide()
 
         self.tabela.setStyleSheet("""
             QTableWidget {
@@ -614,7 +673,8 @@ class TelaProcedimentos(QWidget):
                 padding: 12px 8px;
             }
         """)
-                
+             
+        layout.addWidget(self.btn_desfazer, alignment=Qt.AlignRight)        
         layout.addWidget(self.tabela)
         self.carregar_tabela()
 
@@ -693,5 +753,36 @@ class TelaProcedimentos(QWidget):
     def mostrar_observacao(self, obs): QMessageBox.information(self, "Observação", obs)
 
     def excluir_procedimento(self, id_op):
-        if QMessageBox.question(self, "Excluir", "Deseja excluir permanentemente?", QMessageBox.Yes|QMessageBox.No) == QMessageBox.Yes:
-            database.excluir_procedimento(id_op); self.carregar_tabela()
+        if QMessageBox.question(self, "Excluir", "Deseja excluir este procedimento?", QMessageBox.Yes|QMessageBox.No) == QMessageBox.Yes:
+            conexao = database.conectar(); cursor = conexao.cursor()
+            cursor.execute("SELECT * FROM Procedimentos_Historico WHERE id = ?", (id_op,))
+            self.ultimo_excluido = cursor.fetchone()
+            conexao.close()
+            
+            database.excluir_procedimento(id_op)
+            self.carregar_tabela()
+
+            self.btn_desfazer.show()
+    
+    def restaurar_excluido(self):
+        if self.ultimo_excluido:
+            # Cria um dicionário manual com os dados para salvar
+            dados = {
+                'data_operacao': self.ultimo_excluido[1],
+                'tipo_procedimento': self.ultimo_excluido[2],
+                'casas_envolvidas': self.ultimo_excluido[3],
+                'jogo_time_pa': self.ultimo_excluido[4],
+                'lucro_final': self.ultimo_excluido[5],
+                'bateu_duplo': self.ultimo_excluido[6],
+                'condicao_freebet': self.ultimo_excluido[7],
+                'valor_freebet_coletada': self.ultimo_excluido[8],
+                'observacao': self.ultimo_excluido[9],
+                'mes_referencia': self.ultimo_excluido[10],
+                'casa_destino_freebet': self.ultimo_excluido[11] if len(self.ultimo_excluido) > 11 else "",
+                'status_freebet': self.ultimo_excluido[12] if len(self.ultimo_excluido) > 12 else "N/A",
+                'valor_da_freebet': self.ultimo_excluido[14] if len(self.ultimo_excluido) > 14 else 0.0
+            }
+            database.salvar_procedimento(dados)
+            self.ultimo_excluido = None
+            self.btn_desfazer.hide()
+            self.carregar_tabela()
