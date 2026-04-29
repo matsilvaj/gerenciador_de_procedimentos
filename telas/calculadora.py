@@ -16,6 +16,7 @@ class TelaCalculadora(QWidget):
         self.media_retornos_atual = 0.0
         self.duplo_calculado_final = 0.0
         self.last_edited_index = 0
+        self.stake_fixa_index = 0
         
         self.casa_fb_pendente = None
         self.ids_fb_pendente = None
@@ -83,6 +84,9 @@ class TelaCalculadora(QWidget):
         self.ids_fb_pendente = ids_origem
         
         if self.linhas_sure:
+            self.last_edited_index = 0
+            self.stake_fixa_index = 0
+            self.atualizar_botoes_fixar()
             self.linhas_sure[0]["stake"].setText(f"{valor:.2f}")
             self.linhas_sure[0]["chk_fb"].setChecked(True)
             self.calcular_surebet()
@@ -175,6 +179,34 @@ class TelaCalculadora(QWidget):
         else:
             l["btn_adv"].setStyleSheet("background-color: transparent; color: #a1a1aa; font-size: 12px; border: 1px solid rgba(255,255,255,0.1); border-radius: 6px;")
 
+    def atualizar_indicador_fixar(self, idx):
+        if idx >= len(self.linhas_sure):
+            return
+
+        btn = self.linhas_sure[idx]["btn_fixar"]
+        fixada = self.stake_fixa_index == idx
+        btn.setText("F")
+        btn.setToolTip("Stake fixa atual" if fixada else "Fixar stake")
+
+        if fixada:
+            btn.setStyleSheet("background-color: rgba(59, 130, 246, 0.18); color: #3b82f6; font-size: 13px; border: 1px solid #3b82f6; border-radius: 6px; font-weight: bold;")
+        else:
+            btn.setStyleSheet("background-color: transparent; color: #a1a1aa; font-size: 13px; border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; font-weight: bold;")
+
+    def atualizar_botoes_fixar(self):
+        for idx in range(len(self.linhas_sure)):
+            self.atualizar_indicador_fixar(idx)
+
+    def alternar_stake_fixa(self, idx):
+        if idx >= len(self.linhas_sure):
+            return
+
+        self.stake_fixa_index = idx
+        self.last_edited_index = idx
+
+        self.atualizar_botoes_fixar()
+        self.calcular_surebet()
+
     def atualizar_linhas_surebet(self):
         estados = []
         for l in self.linhas_sure:
@@ -182,7 +214,8 @@ class TelaCalculadora(QWidget):
                 "odd": l["odd"].text(), "stake": l["stake"].text(), "resp": l["inp_resp"].text(),
          
                 "tipo": l["btn_tipo"].text(), "aum": l["inp_aum"].text(), "com": l["inp_com"].text(),
-                "cash": l["inp_cash"].text(), "freebet": l["chk_fb"].isChecked(), "adv_vis": l["container_adv"].isVisible()
+                "cash": l["inp_cash"].text(), "freebet": l["chk_fb"].isChecked(), "adv_vis": l["container_adv"].isVisible(),
+                "stake_manual": l.get("stake_manual", False)
             })
 
         for i in reversed(range(self.layout_linhas.count())): 
@@ -192,6 +225,10 @@ class TelaCalculadora(QWidget):
 
        
         qtd = int(self.combo_qtd.currentText())
+        if self.stake_fixa_index is not None and self.stake_fixa_index >= qtd:
+            self.stake_fixa_index = 0
+        if self.last_edited_index >= qtd:
+            self.last_edited_index = 0
         
         header = QWidget()
         h_lay = QHBoxLayout(header)
@@ -239,9 +276,15 @@ class TelaCalculadora(QWidget):
             inp_resp = QLineEdit(); inp_resp.setPlaceholderText("Responsabilidade")
             inp_resp.setStyleSheet("color: #ec4899; font-weight: bold; background-color: rgba(236, 72, 153, 0.05); border: 1px solid rgba(236, 72, 153, 0.2);")
             inp_resp.hide()
+
+            btn_fixar = QPushButton("F")
+            btn_fixar.setFixedSize(35, 40)
+            btn_fixar.setCursor(Qt.PointingHandCursor)
+            btn_fixar.setToolTip("Fixar stake")
             
             lay_stake.addWidget(inp_stake, 1)
             lay_stake.addWidget(inp_resp, 1)
+            lay_stake.addWidget(btn_fixar, 0)
             
           
             inp_odd.returnPressed.connect(inp_odd.focusNextChild)
@@ -302,8 +345,9 @@ class TelaCalculadora(QWidget):
             self.linhas_sure.append({
     
                 "odd": inp_odd, "stake": inp_stake, "inp_resp": inp_resp, "btn_tipo": btn_tipo, 
-                "lucro_lbl": lbl_lucro, "btn_adv": btn_adv, "container_adv": adv_row,
-                "inp_aum": inp_aum, "inp_com": inp_com, "inp_cash": inp_cash, "chk_fb": chk_fb
+                "lucro_lbl": lbl_lucro, "btn_fixar": btn_fixar, "btn_adv": btn_adv, "container_adv": adv_row,
+                "inp_aum": inp_aum, "inp_com": inp_com, "inp_cash": inp_cash, "chk_fb": chk_fb,
+                "stake_manual": False
             })
             
             
@@ -329,6 +373,7 @@ class TelaCalculadora(QWidget):
                 self.atualizar_indicador_adv(idx)
 
             btn_tipo.clicked.connect(lambda chk=False, idx=i: toggle_tipo(chk, idx))
+            btn_fixar.clicked.connect(lambda chk=False, idx=i: self.alternar_stake_fixa(idx))
             btn_adv.clicked.connect(lambda chk=False, idx=i: toggle_adv(chk, idx))
             
             if i < len(estados):
@@ -336,6 +381,7 @@ class TelaCalculadora(QWidget):
                 inp_odd.setText(e["odd"]); inp_stake.setText(e["stake"]); inp_resp.setText(e["resp"])
                 inp_aum.setText(e["aum"]); inp_com.setText(e["com"]); inp_cash.setText(e["cash"])
                 chk_fb.setChecked(e["freebet"])
+                self.linhas_sure[i]["stake_manual"] = e.get("stake_manual", False)
                 if e["tipo"] == "L":
          
                     btn_tipo.setText("L"); btn_tipo.setStyleSheet("background-color: #ec4899; color: white; border-radius: 6px; font-weight: bold; font-size: 16px;")
@@ -353,9 +399,10 @@ class TelaCalculadora(QWidget):
             
             chk_fb.stateChanged.connect(self.calcular_surebet)
             chk_fb.stateChanged.connect(lambda state, idx=i: self.atualizar_indicador_adv(idx))
-         
+            
             
             self.atualizar_indicador_adv(i)
+            self.atualizar_indicador_fixar(i)
 
         self.calcular_surebet()
 
@@ -364,6 +411,8 @@ class TelaCalculadora(QWidget):
         self.check_duplo.setChecked(False)
         self.casa_fb_pendente = None
         self.ids_fb_pendente = None
+        self.stake_fixa_index = 0
+        self.last_edited_index = 0
         
         for idx, l in enumerate(self.linhas_sure):
             l["odd"].setText("")
@@ -374,12 +423,14 @@ class TelaCalculadora(QWidget):
             l["inp_com"].setText("")
             l["inp_cash"].setText("")
             l["chk_fb"].setChecked(False)
+            l["stake_manual"] = False
             if l["btn_tipo"].text() == "L":
                 l["btn_tipo"].setText("B")
  
                 l["btn_tipo"].setStyleSheet("background-color: #3b82f6; color: white; border-radius: 6px; font-weight: bold; font-size: 16px;")
                 l["inp_resp"].hide()
             self.atualizar_indicador_adv(idx)
+            self.atualizar_indicador_fixar(idx)
                 
         self.combo_qtd.blockSignals(True)
         self.combo_qtd.setCurrentIndex(0)
@@ -388,9 +439,9 @@ class TelaCalculadora(QWidget):
         self.atualizar_linhas_surebet()
         
    
-        for v_inp, o_inp in self.linhas_media:
-            v_inp.setText("")
-            o_inp.setText("")
+        for linha_media in self.linhas_media:
+            linha_media["val"].setText("")
+            linha_media["odd"].setText("")
         self.calcular_media()
 
         # --- NOVO CÓDIGO AQUI ---
@@ -404,7 +455,17 @@ class TelaCalculadora(QWidget):
         self.duplo_calculado_final = 0.0
 
     def on_text_edited(self, idx, source):
-        if source in ["stake", "resp"]: self.last_edited_index = idx
+        if source in ["stake", "resp"]:
+            self.sincronizar_campos(idx, source)
+            if self.stake_fixa_index != idx:
+                self.linhas_sure[idx]["stake_manual"] = bool(self.linhas_sure[idx]["stake"].text().strip())
+                self.calcular_surebet()
+                return
+            self.linhas_sure[idx]["stake_manual"] = False
+            self.last_edited_index = idx
+            self.calcular_surebet()
+            return
+
         self.sincronizar_campos(idx, source)
         self.calcular_surebet()
 
@@ -475,7 +536,7 @@ class TelaCalculadora(QWidget):
          
                 l["math"] = {"M": M, "k": k, "b": b, "o_eff": o_eff, "is_lay": is_lay}
 
-            b_idx = self.last_edited_index
+            b_idx = self.stake_fixa_index if self.stake_fixa_index is not None else self.last_edited_index
             if b_idx >= len(self.linhas_sure): b_idx = 0
             base_str = self.linhas_sure[b_idx]["stake"].text().replace(',', '.')
             if not base_str: raise Exception("Vazio")
@@ -529,15 +590,18 @@ class TelaCalculadora(QWidget):
   
             for i, l in enumerate(self.linhas_sure):
                 c = l["math"]
+                stake_digitada = i != b_idx and l.get("stake_manual") and l["stake"].text().strip()
                 
                 if i == b_idx:
                     s_final = s_base
+                elif stake_digitada:
+                    s_final = float(l["stake"].text().replace(',', '.'))
            
                 else:
                     if c["is_lay"]: s_final = round(stakes[i], 2)
                     else: s_final = float(int(round(stakes[i])))
                 
-                if i != b_idx: 
+                if i != b_idx and not stake_digitada: 
            
                     if c["is_lay"]: l["stake"].setText(f"{s_final:.2f}")
                     else: l["stake"].setText(f"{int(s_final)}")
@@ -743,7 +807,9 @@ class TelaCalculadora(QWidget):
     def calcular_media(self):
         soma_prod = 0; soma_val = 0
         try:
-            for v_inp, o_inp in self.linhas_media:
+            for linha_media in self.linhas_media:
+                v_inp = linha_media["val"]
+                o_inp = linha_media["odd"]
                 v = float(v_inp.text().replace(',', '.')) if v_inp.text() else 0
                 o = float(o_inp.text().replace(',', '.')) if o_inp.text() else 0
                 soma_prod += (v * o); soma_val += v
