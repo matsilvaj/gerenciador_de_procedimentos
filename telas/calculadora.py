@@ -5,6 +5,8 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, Signal
 from telas.procedimentos import DialogNovoProcedimento
+from telas.casas_apostas import adicionar_casas_a_bancas, montar_mensagem_casas_adicionadas
+from telas.notificacoes import mostrar_notificacao
 from core import database
 
 class TelaCalculadora(QWidget):
@@ -709,7 +711,12 @@ class TelaCalculadora(QWidget):
                     database.salvar_procedimento(dialog.dados_finais)
          
                 
-                QMessageBox.information(self, "Sucesso", "Procedimento salvo com sucesso!\nEle já aparecerá na aba de Procedimentos.")
+                mensagem = "Procedimento salvo com sucesso.\nEle já aparecerá na aba de Procedimentos."
+                casas_adicionadas = adicionar_casas_a_bancas(dialog.dados_finais.get('casas_envolvidas', ''))
+                if casas_adicionadas:
+                    mensagem += "\n" + montar_mensagem_casas_adicionadas(casas_adicionadas)
+
+                mostrar_notificacao(self, "Procedimento salvo", mensagem)
         except Exception:
             QMessageBox.warning(self, "Erro", "Houve um problema ao criar o procedimento. Verifique os valores.")
 

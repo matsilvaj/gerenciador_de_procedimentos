@@ -10,6 +10,8 @@ from PySide6.QtCore import Qt, QEvent
 from PySide6.QtGui import QColor, QBrush, QPainter
 from datetime import datetime
 from core import database
+from telas.casas_apostas import adicionar_casas_a_bancas, montar_mensagem_casas_adicionadas
+from telas.notificacoes import mostrar_notificacao
 import locale
 
 
@@ -747,7 +749,15 @@ class TelaProcedimentos(QWidget):
     def abrir_pop_up(self, d_e=None, id_op=None):
         m = DialogNovoProcedimento(self, d_e)
         if m.exec() == QDialog.Accepted:
-            (database.atualizar_procedimento(id_op, m.dados_finais) if id_op else database.salvar_procedimento(m.dados_finais))
+            if id_op:
+                database.atualizar_procedimento(id_op, m.dados_finais)
+            else:
+                database.salvar_procedimento(m.dados_finais)
+                casas_adicionadas = adicionar_casas_a_bancas(m.dados_finais.get('casas_envolvidas', ''))
+                mensagem = "Procedimento salvo com sucesso."
+                if casas_adicionadas:
+                    mensagem += "\n" + montar_mensagem_casas_adicionadas(casas_adicionadas)
+                mostrar_notificacao(self, "Procedimento salvo", mensagem)
             self.carregar_tabela()
 
     def mostrar_observacao(self, obs): QMessageBox.information(self, "Observação", obs)

@@ -5,14 +5,69 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, QSettings
 from core import database
 
+def carregar_casas_ativas():
+    settings = QSettings("GerenciadorProcedimentos", "Bancas")
+    casas_ativas = settings.value("casas_ativas", [])
+    if casas_ativas is None:
+        return []
+    if isinstance(casas_ativas, str):
+        return [casas_ativas] if casas_ativas.strip() else []
+    return [str(casa).strip() for casa in casas_ativas if str(casa).strip()]
+
+def normalizar_casas(casas):
+    if isinstance(casas, str):
+        casas = casas.split(" | ")
+
+    nomes = []
+    vistos = set()
+    for casa in casas or []:
+        nome = str(casa).strip()
+        if not nome or nome in ["None", "-", "Nenhuma selecionada"]:
+            continue
+
+        chave = nome.lower()
+        if chave not in vistos:
+            nomes.append(nome)
+            vistos.add(chave)
+
+    return nomes
+
+def adicionar_casas_a_bancas(casas):
+    nomes = normalizar_casas(casas)
+    if not nomes:
+        return []
+
+    settings = QSettings("GerenciadorProcedimentos", "Bancas")
+    casas_ativas = carregar_casas_ativas()
+    casas_ativas_normalizadas = {casa.lower() for casa in casas_ativas}
+    casas_adicionadas = []
+
+    for nome in nomes:
+        database.adicionar_casa(nome)
+        if nome.lower() in casas_ativas_normalizadas:
+            continue
+
+        casas_ativas.append(nome)
+        casas_ativas_normalizadas.add(nome.lower())
+        casas_adicionadas.append(nome)
+
+    if casas_adicionadas:
+        settings.setValue("casas_ativas", casas_ativas)
+
+    return casas_adicionadas
+
+def montar_mensagem_casas_adicionadas(casas_adicionadas):
+    nomes = ", ".join(casas_adicionadas)
+    if len(casas_adicionadas) == 1:
+        return f"Casa adicionada na aba Bancas: {nomes}"
+    return f"Casas adicionadas na aba Bancas: {nomes}"
+
 class TelaCasasApostas(QWidget):
     def __init__(self):
         super().__init__()
         
         self.settings = QSettings("GerenciadorProcedimentos", "Bancas")
-        self.casas_ativas = self.settings.value("casas_ativas", [])
-        if self.casas_ativas is None: self.casas_ativas = []
-        if isinstance(self.casas_ativas, str): self.casas_ativas = [self.casas_ativas]
+        self.casas_ativas = carregar_casas_ativas()
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(20, 20, 20, 20) 
@@ -156,6 +211,7 @@ class TelaCasasApostas(QWidget):
             self.grid_lay.addWidget(card, i // 4, i % 4)
 
     def atualizar_dados(self):
+        self.casas_ativas = carregar_casas_ativas()
         self.lista_casas_db = database.listar_casas()
         self.completer.model().setStringList(self.lista_casas_db)
         self.renderizar_grid()
