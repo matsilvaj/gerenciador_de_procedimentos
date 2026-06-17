@@ -53,6 +53,8 @@ def atualizar_schema():
         cursor.execute("ALTER TABLE Procedimentos_Historico ADD COLUMN valor_da_freebet REAL DEFAULT 0.0")
     if 'ganhou_freebet' not in colunas:
         cursor.execute("ALTER TABLE Procedimentos_Historico ADD COLUMN ganhou_freebet TEXT DEFAULT ''")
+    if 'categoria_gasto' not in colunas:
+        cursor.execute("ALTER TABLE Procedimentos_Historico ADD COLUMN categoria_gasto TEXT DEFAULT ''")
         
     cursor.execute("PRAGMA table_info(Casas_de_Apostas)")
     colunas_casas = [col[1] for col in cursor.fetchall()]
@@ -72,14 +74,14 @@ def salvar_conversao_freebet(dados, ids_freebet_origem):
     
     query = """
     INSERT INTO Procedimentos_Historico 
-    (data_operacao, tipo_procedimento, casas_envolvidas, jogo_time_pa, lucro_final, valor_freebet_coletada, condicao_freebet, observacao, mes_referencia, id_freebet_origem, casa_destino_freebet, valor_da_freebet)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    (data_operacao, tipo_procedimento, casas_envolvidas, jogo_time_pa, lucro_final, valor_freebet_coletada, condicao_freebet, observacao, mes_referencia, id_freebet_origem, casa_destino_freebet, valor_da_freebet, categoria_gasto)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """
     valores = (
         dados.get('data_operacao', ''), dados.get('tipo_procedimento', ''), dados.get('casas_envolvidas', ''),
         dados.get('jogo_time_pa', ''), dados.get('lucro_final', 0.0), dados.get('valor_freebet_coletada', 0.0),
         dados.get('condicao_freebet', ''), dados.get('observacao', ''), dados.get('mes_referencia', ''),
-        id_referencia, dados.get('casa_destino_freebet', ''), dados.get('valor_da_freebet', 0.0)
+        id_referencia, dados.get('casa_destino_freebet', ''), dados.get('valor_da_freebet', 0.0), dados.get('categoria_gasto', '')
     )
     cursor.execute(query, valores)
     id_conversao = cursor.lastrowid
@@ -142,15 +144,15 @@ def salvar_procedimento(dados):
         data_operacao, tipo_procedimento, casas_envolvidas, jogo_time_pa,
         lucro_final, bateu_duplo, condicao_freebet, valor_freebet_coletada, 
         observacao, mes_referencia, casa_destino_freebet, status_freebet, valor_da_freebet,
-        ganhou_freebet
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ganhou_freebet, categoria_gasto
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """
     valores = (
         dados.get('data_operacao'), dados.get('tipo_procedimento'), dados.get('casas_envolvidas'),
         dados.get('jogo_time_pa'), dados.get('lucro_final'), dados.get('bateu_duplo'),
         dados.get('condicao_freebet'), dados.get('valor_freebet_coletada'), dados.get('observacao'),
         dados.get('mes_referencia'), dados.get('casa_destino_freebet', ''), dados.get('status_freebet', 'N/A'),
-        dados.get('valor_da_freebet', 0.0), dados.get('ganhou_freebet', '')
+        dados.get('valor_da_freebet', 0.0), dados.get('ganhou_freebet', ''), dados.get('categoria_gasto', '')
     )
     cursor.execute(query, valores)
     conexao.commit()
@@ -166,7 +168,7 @@ def atualizar_status_duplo(id_procedimento, bateu):
 def atualizar_resultado_freebet(id_procedimento, resultado):
     conexao = conectar()
     cursor = conexao.cursor()
-    status = 'Finalizada' if resultado == 'N\u00e3o' else 'Pendente'
+    status = 'Finalizada' if resultado == 'Não' else 'Pendente'
     cursor.execute(
         "UPDATE Procedimentos_Historico SET ganhou_freebet = ?, status_freebet = ? WHERE id = ?",
         (resultado, status, id_procedimento)
@@ -230,13 +232,13 @@ def atualizar_procedimento(id_op, dados):
     query = """
     UPDATE Procedimentos_Historico SET 
         tipo_procedimento = ?, jogo_time_pa = ?, casas_envolvidas = ?, 
-        lucro_final = ?, valor_freebet_coletada = ?, condicao_freebet = ?, observacao = ?, casa_destino_freebet = ?, valor_da_freebet = ?
+        lucro_final = ?, valor_freebet_coletada = ?, condicao_freebet = ?, observacao = ?, casa_destino_freebet = ?, valor_da_freebet = ?, categoria_gasto = ?
     WHERE id = ?
     """
     valores = (
         dados['tipo_procedimento'], dados['jogo_time_pa'], dados['casas_envolvidas'],
         dados['lucro_final'], dados['valor_freebet_coletada'], dados['condicao_freebet'],
-        dados['observacao'], dados.get('casa_destino_freebet', ''), dados.get('valor_da_freebet', 0.0), id_op
+        dados['observacao'], dados.get('casa_destino_freebet', ''), dados.get('valor_da_freebet', 0.0), dados.get('categoria_gasto', ''), id_op
     )
     cursor.execute(query, valores)
     conexao.commit()
@@ -260,7 +262,7 @@ def listar_meses_disponiveis():
 def buscar_dados_mes(mes_ref):
     conexao = conectar()
     cursor = conexao.cursor()
-    cursor.execute("SELECT data_operacao, tipo_procedimento, jogo_time_pa, casas_envolvidas, lucro_final, valor_freebet_coletada, bateu_duplo FROM Procedimentos_Historico WHERE mes_referencia = ?", (mes_ref,))
+    cursor.execute("SELECT data_operacao, tipo_procedimento, jogo_time_pa, casas_envolvidas, lucro_final, valor_freebet_coletada, bateu_duplo, categoria_gasto FROM Procedimentos_Historico WHERE mes_referencia = ?", (mes_ref,))
     dados = cursor.fetchall()
     conexao.close()
     return dados

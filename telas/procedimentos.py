@@ -3,10 +3,10 @@
     QComboBox, QLineEdit, QPushButton, QCheckBox,
     QFormLayout, QGroupBox, QDialog, QGridLayout,
     QTableWidget, QTableWidgetItem, QHeaderView,
-    QScrollArea, QMessageBox, QMenu, QAbstractItemView
+    QScrollArea, QMessageBox, QMenu, QAbstractItemView, QDateEdit
 )
 
-from PySide6.QtCore import Qt, QEvent
+from PySide6.QtCore import Qt, QEvent, QDate, Signal
 from PySide6.QtGui import QColor, QBrush, QPainter
 from datetime import datetime
 from core import database
@@ -14,22 +14,18 @@ from telas.casas_apostas import adicionar_casas_a_bancas, montar_mensagem_casas_
 from telas.notificacoes import mostrar_notificacao
 import locale
 
-
-# ConfiguraÃ§Ã£o de idioma para datas
 try:
     locale.setlocale(locale.LC_TIME, 'pt_BR.UTF-8')
 except:
     locale.setlocale(locale.LC_TIME, '')
 
-# Cores Suavizadas Globais (Paleta Modern Minimalist)
 COR_VERDE = "#34d399"
 COR_VERMELHO = "#f87171"
 COR_AZUL_DESTAQUE = "#3b82f6"
-TIPOS_MOVIMENTACAO = ["SureBet", "Tentativa de Duplo", "Coletar Freebet", "Converter Freebet", "Cassino", "Ganho", "Gasto"]
-TIPOS_SIMPLES = ["Ganho", "Gasto"]
+TIPOS_MOVIMENTACAO = ["SureBet", "Tentativa de Duplo", "Coletar Freebet", "Converter Freebet", "Cassino", "Ganho", "Gasto", "Investimento"]
+TIPOS_SIMPLES = ["Ganho", "Gasto", "Investimento"]
 
 class CheckBoxContainer(QWidget):
-    """Container para o checkbox de duplo com Ã¡rea de clique expandida"""
     def __init__(self, checkbox):
         super().__init__()
         self.cb = checkbox
@@ -46,7 +42,6 @@ class CheckBoxContainer(QWidget):
         super().mousePressEvent(event)
 
 class DialogEscolherCasas(QDialog):
-    """Janela moderna para seleÃ§Ã£o e gestÃ£o de casas de apostas"""
     def __init__(self, parent=None, casas_selecionadas=None):
         super().__init__(parent)
         self.setWindowTitle("Escolher Casas")
@@ -115,11 +110,9 @@ class DialogEscolherCasas(QDialog):
         self.checkboxes.clear()
         self.botoes_deletar.clear()
 
-        # Adiciona forÃ§amento de tamanho para o scroll funcionar
         from PySide6.QtWidgets import QSizePolicy
         self.scroll_content.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
 
-        # 1. Pega todas as casas e as casas do histÃ³rico para descobrir o Top 10
         todas_casas = database.listar_casas()
         conexao = database.conectar()
         cursor = conexao.cursor()
@@ -134,10 +127,9 @@ class DialogEscolherCasas(QDialog):
                 frequencia[casa_dest] += 1
         conexao.close()
 
-        # Ordena as casas pelas mais usadas (Top 10)
         casas_ordenadas = sorted(todas_casas, key=lambda x: frequencia.get(x, 0), reverse=True)
         top_9 = casas_ordenadas[:9]
-        restantes = sorted(casas_ordenadas[9:]) # O restante em ordem alfabÃ©tica
+        restantes = sorted(casas_ordenadas[9:])
 
         row, col = 0, 0
         
@@ -174,7 +166,6 @@ class DialogEscolherCasas(QDialog):
                     if col > 2: col = 0; row += 1
             if col != 0: row += 1; col = 0
 
-        # Renderiza os dois grupos
         renderizar_grupo("Mais Usadas", top_9)
         renderizar_grupo("Todas as Casas", restantes)
 
@@ -208,25 +199,55 @@ class DialogEscolherCasas(QDialog):
         return self.casas_selecionadas
     
 class DialogFiltros(QDialog):
-    """Popup para filtrar as movimentacoes na tabela principal"""
     def __init__(self, parent=None, filtros_atuais=None):
         super().__init__(parent)
         self.setWindowTitle("Filtros")
-        self.setMinimumWidth(400)
+        self.setMinimumWidth(450)
         self.setModal(True)
-        self.filtros_atuais = filtros_atuais if filtros_atuais else {"tipos": [], "casas": []}
+        self.filtros_atuais = filtros_atuais if filtros_atuais else {
+            "tipos": [], 
+            "casas": [],
+            "data_inicio": QDate.currentDate().addDays(-30),
+            "data_fim": QDate.currentDate()
+        }
         
         self.setStyleSheet("""
             QDialog { background-color: #09090b; }
-            QGroupBox { border: none; margin-top: 15px; padding-top: 15px; color: #f4f4f5; }
+            QGroupBox { border: none; margin-top: 15px; padding-top: 15px; color: #f4f4f5; font-weight: bold;}
             QLabel { color: #a1a1aa; font-weight: bold; }
             QCheckBox { color: #f4f4f5; font-size: 14px; padding: 5px; }
             QPushButton { background-color: #27272a; color: white; border-radius: 8px; padding: 10px; font-weight: bold; border: none; }
+            QDateEdit { background-color: #18181b; color: white; padding: 8px 12px; border: none; border-radius: 8px; outline: none; }
+            QDateEdit::drop-down { border: none; }
         """)
 
         layout = QVBoxLayout(self)
 
-        grupo_tipos = QGroupBox("Tipo de Movimentacao")
+        grupo_datas = QGroupBox("Período")
+        lay_datas = QHBoxLayout()
+        
+        self.data_inicio = QDateEdit()
+        self.data_inicio.setDisplayFormat("dd/MM/yyyy")
+        self.data_inicio.setCalendarPopup(True)
+        self.data_inicio.setMinimumWidth(125)
+        self.data_inicio.setDate(self.filtros_atuais.get("data_inicio", QDate.currentDate().addDays(-30)))
+        
+        self.data_fim = QDateEdit()
+        self.data_fim.setDisplayFormat("dd/MM/yyyy")
+        self.data_fim.setCalendarPopup(True)
+        self.data_fim.setMinimumWidth(125)
+        self.data_fim.setDate(self.filtros_atuais.get("data_fim", QDate.currentDate()))
+
+        lay_datas.addWidget(QLabel("De:"))
+        lay_datas.addWidget(self.data_inicio)
+        lay_datas.addSpacing(15)
+        lay_datas.addWidget(QLabel("Até:"))
+        lay_datas.addWidget(self.data_fim)
+        lay_datas.addStretch()
+        grupo_datas.setLayout(lay_datas)
+        layout.addWidget(grupo_datas)
+
+        grupo_tipos = QGroupBox("Tipo de Movimentação")
         lay_tipos = QVBoxLayout()
         self.checks_tipos = {}
         for t in TIPOS_MOVIMENTACAO:
@@ -252,7 +273,7 @@ class DialogFiltros(QDialog):
         layout.addWidget(grupo_casas)
 
         botoes = QHBoxLayout()
-        btn_limpar = QPushButton("Limpar")
+        btn_limpar = QPushButton("Limpar Filtros")
         btn_limpar.setStyleSheet("background-color: transparent; color: #71717a;")
         btn_limpar.clicked.connect(self.limpar)
         
@@ -276,14 +297,17 @@ class DialogFiltros(QDialog):
     def limpar(self):
         for chk in self.checks_tipos.values(): chk.setChecked(False)
         self.lbl_casas.setText("Nenhuma selecionada"); self.lbl_casas.setStyleSheet("color: #a1a1aa;")
+        self.data_inicio.setDate(QDate.currentDate().addDays(-30))
+        self.data_fim.setDate(QDate.currentDate())
 
     def aplicar(self):
         self.filtros_atuais["tipos"] = [t for t, chk in self.checks_tipos.items() if chk.isChecked()]
         self.filtros_atuais["casas"] = [] if self.lbl_casas.text() == "Nenhuma selecionada" else self.lbl_casas.text().split(" | ")
+        self.filtros_atuais["data_inicio"] = self.data_inicio.date()
+        self.filtros_atuais["data_fim"] = self.data_fim.date()
         self.accept()
 
 class DialogNovoProcedimento(QDialog):
-    """Janela ultra moderna para criaÃ§Ã£o ou ediÃ§Ã£o de procedimentos"""
     def __init__(self, parent=None, dados_edicao=None):
         super().__init__(parent)
         self.dados_edicao = dados_edicao
@@ -302,14 +326,14 @@ class DialogNovoProcedimento(QDialog):
         self.layout_principal = QVBoxLayout(self)
         self.layout_principal.setSizeConstraint(QVBoxLayout.SetFixedSize) 
 
-        layout_botoes = QHBoxLayout()
+        layout_botoes = QGridLayout()
         layout_botoes.setSpacing(10)
         self.botoes_tipo = []
-        for tipo in TIPOS_MOVIMENTACAO:
+        for i, tipo in enumerate(TIPOS_MOVIMENTACAO):
             btn = QPushButton(tipo)
             btn.setCursor(Qt.PointingHandCursor)
             btn.clicked.connect(lambda checked, t=tipo: self.selecionar_tipo(t))
-            layout_botoes.addWidget(btn)
+            layout_botoes.addWidget(btn, i//4, i%4)
             self.botoes_tipo.append(btn)
         self.layout_principal.addLayout(layout_botoes)
 
@@ -321,6 +345,9 @@ class DialogNovoProcedimento(QDialog):
         self.combo_condicao = QComboBox()
         self.combo_condicao.addItems(["Freebet Garantida", "Apenas se perder a aposta"])
         
+        self.input_categoria = QLineEdit()
+        self.input_categoria.setPlaceholderText("Ex: Ferramentas, Curso, Mentoria...")
+        
         self.lbl_casa_freebet = QLabel("")
         self.btn_escolher_casa_fb = QPushButton("Escolher")
         self.btn_escolher_casa_fb.clicked.connect(self.abrir_seletor_casa_freebet)
@@ -331,6 +358,7 @@ class DialogNovoProcedimento(QDialog):
         lay_cfb.addWidget(self.lbl_casa_freebet, stretch=1); lay_cfb.addWidget(self.btn_escolher_casa_fb)
 
         self.layout_detalhes.addRow("Evento:", self.input_jogo)
+        self.layout_detalhes.addRow("Categoria:", self.input_categoria)
         self.layout_detalhes.addRow("Condicao FB:", self.combo_condicao)
         self.layout_detalhes.addRow("Casa da FB:", self.container_casa_fb)
         self.grupo_detalhes.setLayout(self.layout_detalhes)
@@ -351,17 +379,7 @@ class DialogNovoProcedimento(QDialog):
         
         self.input_valor_duplo = QLineEdit() 
         self.input_valor_freebet = QLineEdit()
-        
-        self.check_lucro_igual = QCheckBox("")
-        self.check_lucro_igual.hide()
         self.input_entrada = QLineEdit()
-        self.lista_inputs_protecoes = []; self.lista_containers_protecoes = []
-        
-        self.btn_add_protecao = QPushButton("")
-        self.btn_add_protecao.setCursor(Qt.PointingHandCursor)
-        self.btn_add_protecao.setStyleSheet("color: #71717a; background: transparent; text-align: left; font-size: 12px; padding: 0;")
-        self.btn_add_protecao.clicked.connect(lambda: self.adicionar_campo_protecao())
-        self.btn_add_protecao.hide()
         
         self.layout_valores.addRow("Valor Duplo (R$):", self.input_valor_duplo)
         self.layout_valores.addRow("Valor da Freebet (R$):", self.input_valor_freebet)
@@ -396,27 +414,6 @@ class DialogNovoProcedimento(QDialog):
 
         if dados_edicao: self.preencher_dados_edicao()
         else: self.selecionar_tipo("SureBet")
-
-    def adicionar_campo_protecao(self, texto_padrao="", eh_padrao=False):
-        container = QWidget()
-        lay = QHBoxLayout(container); lay.setContentsMargins(0, 0, 0, 0)
-        novo_inp = QLineEdit()
-        self.lista_inputs_protecoes.append(novo_inp); self.lista_containers_protecoes.append(container)
-        lay.addWidget(novo_inp)
-        if eh_padrao: self.layout_valores.addRow(texto_padrao, container)
-        else:
-            btn_remover = QPushButton("-")
-            btn_remover.setFixedSize(38, 38) 
-            btn_remover.setStyleSheet("color: #71717a; background: #27272a; border-radius: 8px; font-weight: bold; font-size: 16px;")
-            btn_remover.clicked.connect(lambda: self.remover_protecao(container, novo_inp))
-            lay.addWidget(btn_remover)
-            self.layout_valores.insertRow(self.layout_valores.rowCount() - 1, texto_padrao, container)
-            novo_inp.setFocus()
-
-    def remover_protecao(self, container, inp):
-        if inp in self.lista_inputs_protecoes: self.lista_inputs_protecoes.remove(inp)
-        if container in self.lista_containers_protecoes: self.lista_containers_protecoes.remove(container)
-        self.layout_valores.removeRow(container)
 
     def abrir_seletor_casa_freebet(self):
         atuais = [self.lbl_casa_freebet.text()] if self.lbl_casa_freebet.text() != "" else []
@@ -459,56 +456,45 @@ class DialogNovoProcedimento(QDialog):
         is_coleta = (tipo == "Coletar Freebet")
         is_conversao = (tipo == "Converter Freebet")
         is_simples = tipo in TIPOS_SIMPLES
+        is_gasto = (tipo == "Gasto")
         
-        self.grupo_detalhes.setVisible((not is_cassino and tipo != "SureBet") or is_simples)
+        self.grupo_detalhes.setVisible(not is_cassino)
         self.grupo_casas.setVisible(not is_simples)
         
-        # Valor Freebet APENAS para Coletar Freebet
         self.input_valor_freebet.setVisible(is_coleta)
         lbl_vfb = self.layout_valores.labelForField(self.input_valor_freebet)
         if lbl_vfb: lbl_vfb.setVisible(is_coleta)
         
-        # Valor Duplo aparece sempre que nÃ£o for Cassino ou Surebet
         self.input_valor_duplo.setVisible(not is_cassino and tipo != "SureBet" and not is_simples)
         lbl_vd = self.layout_valores.labelForField(self.input_valor_duplo)
         if lbl_vd: lbl_vd.setVisible(not is_cassino and tipo != "SureBet" and not is_simples)
         
+        self.input_categoria.setVisible(is_gasto)
+        lbl_cat = self.layout_detalhes.labelForField(self.input_categoria)
+        if lbl_cat: lbl_cat.setVisible(is_gasto)
+
         self.combo_condicao.setVisible(is_coleta)
         self.container_casa_fb.setVisible(is_coleta or is_conversao)
         
         lbl_evento = self.layout_detalhes.labelForField(self.input_jogo)
-        if lbl_evento: lbl_evento.setVisible(True)
-        self.input_jogo.setVisible(True)
+        if lbl_evento: lbl_evento.setVisible(tipo != "Gasto" and not is_cassino)
+        self.input_jogo.setVisible(tipo != "Gasto" and not is_cassino)
 
         lbl_cond = self.layout_detalhes.labelForField(self.combo_condicao)
         if lbl_cond: lbl_cond.setVisible(is_coleta)
         lbl_cfb = self.layout_detalhes.labelForField(self.container_casa_fb)
         if lbl_cfb: lbl_cfb.setVisible(is_coleta or is_conversao)
 
-        self.check_lucro_igual.setVisible(False)
-        self.btn_add_protecao.setVisible(False)
-        for c in self.lista_containers_protecoes:
-            c.setVisible(False)
-            lbl = self.layout_valores.labelForField(c)
-            if lbl: lbl.setVisible(False)
-
         lbl_base = self.layout_valores.labelForField(self.input_entrada)
         if lbl_base:
             if tipo == "Ganho": lbl_base.setText("Valor do Ganho (R$):")
             elif tipo == "Gasto": lbl_base.setText("Valor do Gasto (R$):")
+            elif tipo == "Investimento": lbl_base.setText("Valor Investido (R$):")
             elif is_cassino: lbl_base.setText("Lucro / Perda (R$):")
             else: lbl_base.setText("Resultado Base (R$):")
 
         if not self.dados_edicao:
             self.btn_salvar.setText("CRIAR MOVIMENTACAO" if is_simples else "CRIAR PROCEDIMENTO")
-
-    def alternar_lucro_igual(self, marcado):
-        for container in self.lista_containers_protecoes:
-            lbl = self.layout_valores.labelForField(container)
-            container.setVisible(not marcado); (lbl.setVisible(not marcado) if lbl else None)
-        self.btn_add_protecao.setVisible(not marcado)
-        lbl_base = self.layout_valores.labelForField(self.input_entrada)
-        if lbl_base: lbl_base.setText("Resultado Base (R$):")
 
     def mostrar_campo_obs(self): self.btn_add_obs.hide(); self.container_obs.show(); self.input_obs.setFocus()
     def esconder_campo_obs(self): self.input_obs.clear(); self.container_obs.hide(); self.btn_add_obs.show()
@@ -517,8 +503,10 @@ class DialogNovoProcedimento(QDialog):
         d = self.dados_edicao; self.selecionar_tipo(d['tipo']); self.input_jogo.setText(d['jogo'])
         if d['casas'] not in ["None", "-", ""]: self.lbl_casas_selecionadas.setText(d['casas']); self.lbl_casas_selecionadas.setStyleSheet(f"color: {COR_AZUL_DESTAQUE};")
         if d.get('casa_fb') not in ["None", "-", ""]: self.lbl_casa_freebet.setText(d['casa_fb']); self.lbl_casa_freebet.setStyleSheet(f"color: {COR_AZUL_DESTAQUE};")
-        valor_edicao = abs(d['lucro_base']) if d['tipo'] == "Gasto" else d['lucro_base']
-        self.check_lucro_igual.setChecked(True); self.input_entrada.setText(str(valor_edicao))
+        if d.get('categoria_gasto'): self.input_categoria.setText(d['categoria_gasto'])
+        
+        valor_edicao = abs(d['lucro_base']) if d['tipo'] in ["Gasto", "Investimento"] else d['lucro_base']
+        self.input_entrada.setText(str(valor_edicao))
         self.input_valor_duplo.setText(str(d['v_duplo']))
         self.input_valor_freebet.setText(str(d.get('v_fb', 0.0)))
         if d['obs']: self.mostrar_campo_obs(); self.input_obs.setText(d['obs'])
@@ -534,6 +522,9 @@ class DialogNovoProcedimento(QDialog):
             elif self.tipo_selecionado == "Gasto":
                 l_base = -abs(v_ent)
                 jogo_nome = self.input_jogo.text()
+            elif self.tipo_selecionado == "Investimento":
+                l_base = abs(v_ent)
+                jogo_nome = self.input_jogo.text()
             elif self.tipo_selecionado == "Cassino":
                 l_base = v_ent
                 jogo_nome = "-"
@@ -548,6 +539,7 @@ class DialogNovoProcedimento(QDialog):
                 'valor_freebet_coletada': float(self.input_valor_duplo.text().replace(',', '.')) if self.input_valor_duplo.isVisible() and self.input_valor_duplo.text() else 0.0,
                 'valor_da_freebet': float(self.input_valor_freebet.text().replace(',', '.')) if self.input_valor_freebet.isVisible() and self.input_valor_freebet.text() else 0.0,
                 'condicao_freebet': self.combo_condicao.currentText() if self.combo_condicao.isVisible() else '',
+                'categoria_gasto': self.input_categoria.text() if self.tipo_selecionado == "Gasto" else '',
                 'observacao': self.input_obs.text(), 'mes_referencia': datetime.now().strftime("%m/%Y"),
                 'casa_destino_freebet': self.lbl_casa_freebet.text() if self.tipo_selecionado in ["Coletar Freebet", "Converter Freebet"] else "",
                 'status_freebet': 'Pendente' if self.tipo_selecionado == "Coletar Freebet" else 'N/A'
@@ -559,15 +551,13 @@ class TabelaProcedimentos(QTableWidget):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.hover_row = -1
-        
         self.setMouseTracking(True)
         self.viewport().setMouseTracking(True)
         self.cellEntered.connect(self._ao_fazer_hover)
         self.viewport().installEventFilter(self)
 
     def _ao_fazer_hover(self, row, column):
-        if self.hover_row == row:
-            return
+        if self.hover_row == row: return
         self.hover_row = row
         self.viewport().update()
 
@@ -586,43 +576,51 @@ class TabelaProcedimentos(QTableWidget):
         super().paintEvent(event)
 
 class TelaProcedimentos(QWidget):
-    """Painel principal que lista todos os procedimentos"""
     def __init__(self):
         super().__init__()
-        self.filtros_avancados = {"tipos": [], "casas": []}
+        self.filtros_avancados = {
+            "tipos": [], 
+            "casas": [],
+            "data_inicio": QDate.currentDate().addDays(-30),
+            "data_fim": QDate.currentDate()
+        }
+        
         layout = QVBoxLayout(self)
         layout.setContentsMargins(40, 30, 40, 40)
         
-        titulo = QLabel(f"Movimentacoes - {datetime.now().strftime('%B %Y').capitalize()}")
+        titulo = QLabel(f"Movimentações - {datetime.now().strftime('%B %Y').capitalize()}")
         titulo.setStyleSheet("font-size: 22px; font-weight: bold; color: #f4f4f5;")
         layout.addWidget(titulo)
         
         filtros_layout = QHBoxLayout()
+
         self.input_busca = QLineEdit()
         self.input_busca.setPlaceholderText("Buscar tipo, evento ou casa...")
-        self.input_busca.setStyleSheet("background-color: #18181b; color: white; padding: 12px; border: none; border-radius: 8px; outline: none;")
+        self.input_busca.setStyleSheet("background-color: #18181b; color: white; padding: 10px; border: none; border-radius: 8px; outline: none;")
         self.input_busca.textChanged.connect(self.carregar_tabela)
         
-        self.btn_filtros = QPushButton("Filtros")
-        self.btn_filtros.setStyleSheet("background-color: #27272a; color: white; font-weight: bold; padding: 12px 20px; border-radius: 8px; border: none;")
+        self.btn_filtros = QPushButton("Filtros e Datas")
+        self.btn_filtros.setStyleSheet("background-color: #27272a; color: white; font-weight: bold; padding: 10px 20px; border-radius: 8px; border: none;")
         self.btn_filtros.clicked.connect(self.abrir_filtros)
         
-        self.btn_abrir_modal = QPushButton("Nova Movimentacao")
-        self.btn_abrir_modal.setStyleSheet("background-color: #f4f4f5; color: #09090b; border: none; font-weight: bold; padding: 12px 24px; border-radius: 8px;")
+        self.btn_abrir_modal = QPushButton("Nova Movimentação")
+        self.btn_abrir_modal.setStyleSheet("background-color: #f4f4f5; color: #09090b; border: none; font-weight: bold; padding: 10px 24px; border-radius: 8px;")
         self.btn_abrir_modal.clicked.connect(lambda: self.abrir_pop_up())
 
-        filtros_layout.addWidget(self.input_busca); filtros_layout.addWidget(self.btn_filtros)
-        filtros_layout.addStretch(); filtros_layout.addWidget(self.btn_abrir_modal)
+        filtros_layout.addWidget(self.input_busca)
+        filtros_layout.addWidget(self.btn_filtros)
+        filtros_layout.addStretch()
+        filtros_layout.addWidget(self.btn_abrir_modal)
         layout.addLayout(filtros_layout)
 
         self.tabela = TabelaProcedimentos(0, 8)
-        self.tabela.setHorizontalHeaderLabels(["Data", "Tipo", "Evento", "Casas", "Resultado Base", "Duplo?", "Resultado Final", ""])
+        self.tabela.setHorizontalHeaderLabels(["Data", "Tipo", "Evento/Cat.", "Casas", "Resultado Base", "Duplo?", "Resultado Final", ""])
         self.tabela.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.tabela.horizontalHeader().setSectionResizeMode(7, QHeaderView.Fixed)
         self.tabela.setColumnWidth(7, 50)
         
         self.tabela.horizontalHeader().setSectionResizeMode(0, QHeaderView.Fixed)
-        self.tabela.setColumnWidth(0, 60)
+        self.tabela.setColumnWidth(0, 90)
         self.tabela.horizontalHeader().setSectionResizeMode(5, QHeaderView.Fixed)
         self.tabela.setColumnWidth(5, 75)
 
@@ -631,72 +629,50 @@ class TelaProcedimentos(QWidget):
         self.tabela.setEditTriggers(QTableWidget.NoEditTriggers)
         self.tabela.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.tabela.setSelectionMode(QAbstractItemView.NoSelection)
-        
         self.tabela.setShowGrid(False)
         self.tabela.setFocusPolicy(Qt.NoFocus)
         
         self.ultimo_excluido = None
-        
-        self.btn_desfazer = QPushButton("Desfazer exclusao")
+        self.btn_desfazer = QPushButton("Desfazer exclusão")
         self.btn_desfazer.setCursor(Qt.PointingHandCursor)
-        self.btn_desfazer.setStyleSheet("""
-            QPushButton {
-                background-color: transparent; 
-                color: #71717a; /* Cinza escuro sutil */
-                font-weight: bold; 
-                font-size: 13px;
-                border: none;
-            }
-            QPushButton:hover {
-                color: #a1a1aa; /* Fica levemente mais claro no hover */
-            }
-        """)
+        self.btn_desfazer.setStyleSheet("QPushButton { background-color: transparent; color: #71717a; font-weight: bold; font-size: 13px; border: none; } QPushButton:hover { color: #a1a1aa; }")
         self.btn_desfazer.clicked.connect(self.restaurar_excluido)
         self.btn_desfazer.hide()
 
         self.tabela.setStyleSheet("""
-            QTableWidget {
-                background-color: transparent;
-                color: #f4f4f5;
-                border: none;
-                outline: none;
-                font-size: 14px;
-                gridline-color: transparent;
-            }
-            QTableWidget::item {
-                border: none;
-                border-bottom: 1px solid rgba(255,255,255,0.03);
-                padding: 5px;
-                background: transparent;
-            }
-            QTableWidget::item:selected {
-                background-color: transparent;
-                color: #f4f4f5;
-                border: none;
-                outline: none;
-            }
-            QHeaderView::section {
-                background-color: transparent;
-                color: #71717a;
-                font-weight: bold;
-                border: none;
-                border-bottom: 1px solid rgba(255,255,255,0.05);
-                padding: 12px 8px;
-            }
+            QTableWidget { background-color: transparent; color: #f4f4f5; border: none; outline: none; font-size: 14px; gridline-color: transparent; }
+            QTableWidget::item { border: none; border-bottom: 1px solid rgba(255,255,255,0.03); padding: 5px; background: transparent; }
+            QTableWidget::item:selected { background-color: transparent; color: #f4f4f5; border: none; outline: none; }
+            QHeaderView::section { background-color: transparent; color: #71717a; font-weight: bold; border: none; border-bottom: 1px solid rgba(255,255,255,0.05); padding: 12px 8px; }
         """)
              
         layout.addWidget(self.btn_desfazer, alignment=Qt.AlignRight)        
         layout.addWidget(self.tabela)
         self.carregar_tabela()
 
+    def aplicar_filtro_externo(self, tipo):
+        self.filtros_avancados["tipos"] = [tipo]
+        self.carregar_tabela()
+
     def carregar_tabela(self):
         self.tabela.setRowCount(0)
         f_t = self.input_busca.text().lower()
         conexao = database.conectar(); cursor = conexao.cursor()
-        cursor.execute("SELECT id, data_operacao, tipo_procedimento, jogo_time_pa, casas_envolvidas, lucro_final, valor_freebet_coletada, bateu_duplo, condicao_freebet, observacao, casa_destino_freebet, valor_da_freebet FROM Procedimentos_Historico ORDER BY id DESC")
         
-        for id_op, data, tipo, jogo, casas, lucro, v_duplo, bateu, cond, obs, casa_fb, v_fb in cursor.fetchall():
-            texto_busca = f"{tipo} {jogo or ''} {casas or ''}".lower()
+        cursor.execute("SELECT id, data_operacao, tipo_procedimento, jogo_time_pa, casas_envolvidas, lucro_final, valor_freebet_coletada, bateu_duplo, condicao_freebet, observacao, casa_destino_freebet, valor_da_freebet, categoria_gasto FROM Procedimentos_Historico ORDER BY id DESC")
+        
+        dt_in = self.filtros_avancados.get("data_inicio", QDate.currentDate().addDays(-30))
+        dt_out = self.filtros_avancados.get("data_fim", QDate.currentDate())
+
+        for d_t in cursor.fetchall():
+            id_op, data_str, tipo, jogo, casas, lucro, v_duplo, bateu, cond, obs, casa_fb, v_fb, cat_gasto = d_t
+
+            try:
+                dt_obj = QDate.fromString(data_str, "dd/MM/yyyy")
+                if dt_obj < dt_in or dt_obj > dt_out: continue
+            except: pass
+
+            texto_busca = f"{tipo} {jogo or ''} {casas or ''} {cat_gasto or ''}".lower()
             if f_t and f_t not in texto_busca: continue
             if self.filtros_avancados["tipos"] and tipo not in self.filtros_avancados["tipos"]: continue
             if self.filtros_avancados["casas"] and not any(c in casas for c in self.filtros_avancados["casas"]): continue
@@ -707,42 +683,44 @@ class TelaProcedimentos(QWidget):
                 it = QTableWidgetItem(str(t) if t not in ["None", None, ""] else "-")
                 it.setTextAlignment(Qt.AlignCenter); (it.setForeground(QBrush(QColor(cor))) if cor else None); return it
 
-            self.tabela.setItem(row, 0, item(data.split('/')[0]))
+            self.tabela.setItem(row, 0, item(data_str))
             self.tabela.setItem(row, 1, item(tipo + (" *" if obs else "")))
-            self.tabela.setItem(row, 2, item(jogo))
+            
+            self.tabela.setItem(row, 2, item(cat_gasto.strip().title() if tipo == "Gasto" and cat_gasto else jogo))
+            
             it_c = item(casas); it_c.setToolTip(casas); self.tabela.setItem(row, 3, it_c)
-            self.tabela.setItem(row, 4, item(f"R$ {lucro:.2f}", COR_VERDE if lucro >= 0 else COR_VERMELHO))
 
-            if tipo in ["SureBet", "Cassino", "Ganho", "Gasto"]:
-                # Coloca "-" no Lucro Base e no Duplo para SureBet e Cassino
+            cor_valor = COR_VERDE if lucro >= 0 else COR_VERMELHO
+            if tipo == "Investimento": cor_valor = "#3b82f6" 
+            
+            self.tabela.setItem(row, 4, item(f"R$ {lucro:.2f}", cor_valor))
+
+            if tipo in ["SureBet", "Cassino", "Ganho", "Gasto", "Investimento"]:
                 self.tabela.setItem(row, 4, item("-", "#71717a"))
                 self.tabela.setItem(row, 5, item("-", "#71717a"))
-                self.tabela.setItem(row, 6, item(f"R$ {lucro:.2f}", COR_VERDE if lucro >= 0 else COR_VERMELHO))
+                self.tabela.setItem(row, 6, item(f"R$ {lucro:.2f}", cor_valor))
             else:
-                # Mostra o Lucro Base e a checkbox do Duplo para os demais procedimentos
-                self.tabela.setItem(row, 4, item(f"R$ {lucro:.2f}", COR_VERDE if lucro >= 0 else COR_VERMELHO))
+                self.tabela.setItem(row, 4, item(f"R$ {lucro:.2f}", cor_valor))
                 cb = QCheckBox(); cb.setChecked(bool(bateu))
                 cb.stateChanged.connect(lambda s, i=id_op, lb=lucro, vd=v_duplo, r=row: self.atualizar_duplo_tela(s, i, lb, vd, r))
                 self.tabela.setCellWidget(row, 5, CheckBoxContainer(cb))
                 self.atualizar_duplo_tela(cb.checkState(), id_op, lucro, v_duplo, row, False)
 
-            btn_acoes = QPushButton("...")
+            btn_acoes = QPushButton("⋮")
             btn_acoes.setCursor(Qt.PointingHandCursor)
-            btn_acoes.setStyleSheet("""
-                QPushButton { color: #71717a; font-size: 10px; border: none; background: transparent; padding: 5px; }
-                QPushButton:hover { color: #f4f4f5; }
-                QPushButton::menu-indicator { image: none; }
-            """)
+            
+            btn_acoes.setStyleSheet("QPushButton { color: #71717a; font-size: 16px; border: none; background: transparent; font-weight: bold; } QPushButton:hover { color: #f4f4f5; }")
             menu = QMenu(self)
             menu.setStyleSheet("QMenu { background-color: #18181b; color: #f4f4f5; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05); outline: none; } QMenu::item { padding: 10px 25px; } QMenu::item:selected { background-color: #27272a; }")
             if obs: 
                 menu.addAction("Ver Obs").triggered.connect(lambda checked=False, o=obs: self.mostrar_observacao(o))
             
-            dados_edicao = {'tipo':tipo, 'jogo':jogo, 'casas':casas, 'lucro_base':lucro, 'v_duplo':v_duplo, 'obs':obs, 'condicao':cond, 'casa_fb':casa_fb, 'v_fb':v_fb}
+            dados_edicao = {'tipo':tipo, 'jogo':jogo, 'casas':casas, 'lucro_base':lucro, 'v_duplo':v_duplo, 'obs':obs, 'condicao':cond, 'casa_fb':casa_fb, 'v_fb':v_fb, 'categoria_gasto':cat_gasto}
             menu.addAction("Editar").triggered.connect(lambda checked=False, d=dados_edicao, i=id_op: self.abrir_pop_up(d, i))
-            
             menu.addAction("Excluir").triggered.connect(lambda checked=False, i=id_op: self.excluir_procedimento(i))
-            btn_acoes.setMenu(menu); self.tabela.setCellWidget(row, 7, btn_acoes)
+            
+            btn_acoes.clicked.connect(lambda checked=False, m=menu, b=btn_acoes: m.exec(b.mapToGlobal(b.rect().bottomLeft())))
+            self.tabela.setCellWidget(row, 7, btn_acoes)
 
     def atualizar_duplo_tela(self, state, id_op, base, duplo, row, save=True):
         final = base + (duplo if state == 2 or state == Qt.Checked else 0)
@@ -764,29 +742,26 @@ class TelaProcedimentos(QWidget):
             else:
                 database.salvar_procedimento(m.dados_finais)
                 casas_adicionadas = adicionar_casas_a_bancas(m.dados_finais.get('casas_envolvidas', ''))
-                mensagem = "Movimentacao salva com sucesso."
+                mensagem = "Movimentação salva com sucesso."
                 if casas_adicionadas:
                     mensagem += "\n" + montar_mensagem_casas_adicionadas(casas_adicionadas)
-                mostrar_notificacao(self, "Movimentacao salva", mensagem)
+                mostrar_notificacao(self, "Movimentação salva", mensagem)
             self.carregar_tabela()
 
     def mostrar_observacao(self, obs): QMessageBox.information(self, "Observacao", obs)
 
     def excluir_procedimento(self, id_op):
-        if QMessageBox.question(self, "Excluir", "Deseja excluir esta movimentacao?", QMessageBox.Yes|QMessageBox.No) == QMessageBox.Yes:
+        if QMessageBox.question(self, "Excluir", "Deseja excluir esta movimentação?", QMessageBox.Yes|QMessageBox.No) == QMessageBox.Yes:
             conexao = database.conectar(); cursor = conexao.cursor()
             cursor.execute("SELECT * FROM Procedimentos_Historico WHERE id = ?", (id_op,))
             self.ultimo_excluido = cursor.fetchone()
             conexao.close()
-            
             database.excluir_procedimento(id_op)
             self.carregar_tabela()
-
             self.btn_desfazer.show()
     
     def restaurar_excluido(self):
         if self.ultimo_excluido:
-            # Cria um dicionÃ¡rio manual com os dados para salvar
             dados = {
                 'data_operacao': self.ultimo_excluido[1],
                 'tipo_procedimento': self.ultimo_excluido[2],
@@ -801,15 +776,10 @@ class TelaProcedimentos(QWidget):
                 'casa_destino_freebet': self.ultimo_excluido[11] if len(self.ultimo_excluido) > 11 else "",
                 'status_freebet': self.ultimo_excluido[12] if len(self.ultimo_excluido) > 12 else "N/A",
                 'valor_da_freebet': self.ultimo_excluido[14] if len(self.ultimo_excluido) > 14 else 0.0,
-                'ganhou_freebet': self.ultimo_excluido[15] if len(self.ultimo_excluido) > 15 else ""
+                'ganhou_freebet': self.ultimo_excluido[15] if len(self.ultimo_excluido) > 15 else "",
+                'categoria_gasto': self.ultimo_excluido[16] if len(self.ultimo_excluido) > 16 else ""
             }
             database.salvar_procedimento(dados)
             self.ultimo_excluido = None
             self.btn_desfazer.hide()
             self.carregar_tabela()
-
-    def desfazer_ultima_acao(self):
-        if not self.ultimo_excluido:
-            return False
-        self.restaurar_excluido()
-        return True
