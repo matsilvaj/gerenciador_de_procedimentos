@@ -99,8 +99,6 @@ class TelaDashboard(QWidget):
         self.chart_view.chart().setTitleBrush(QBrush(QColor("#f4f4f5")))
         self.chart_view.chart().legend().setLabelBrush(QBrush(QColor("#f4f4f5")))
         lay_pizza.addWidget(self.chart_view)
-        
-        self.abas_graficos.addTab(self.aba_pizza, "Distribuição (Pizza)")
 
         aba_freebet = QWidget()
         aba_freebet.setStyleSheet("background: transparent;") 
@@ -124,6 +122,8 @@ class TelaDashboard(QWidget):
 
         self.abas_graficos.addTab(aba_freebet, "Métricas Freebet")
         layout_principal.addWidget(self.abas_graficos)
+        
+        self.abas_graficos.addTab(self.aba_pizza, "Distribuição")
 
         estilo_tooltip = "QLabel { background-color: rgba(24, 24, 27, 240); color: #f4f4f5; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 6px 12px; font-weight: bold; font-size: 13px; }"
         self.tt_linha = QLabel(self.grafico_linha); self.tt_linha.setStyleSheet(estilo_tooltip); self.tt_linha.hide()
@@ -290,7 +290,7 @@ class TelaDashboard(QWidget):
             if tipo == "Investimento":
                 t_invest += abs(l_real)
             elif tipo == "Gasto" or l_real < 0:
-                cat = cat_gasto.strip().title() if cat_gasto and cat_gasto.strip() else "Outros Gastos"
+                cat = cat_gasto.strip().title() if cat_gasto and cat_gasto.strip() else "Perdas Procedimentos"
                 self.gastos_detalhes[cat] = self.gastos_detalhes.get(cat, 0) + abs(l_real)
             elif l_real > 0:
                 self.ganhos_detalhes[tipo_normalizado] = self.ganhos_detalhes.get(tipo_normalizado, 0) + l_real
