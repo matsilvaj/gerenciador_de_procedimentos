@@ -61,7 +61,10 @@ class TelaDashboard(QWidget):
             "SureBet",
             "Tentativa de Duplo",
             "Coletar Freebet",
-            "Converter Freebet"
+            "Converter Freebet",
+            "Cassino",
+            "Ganho",
+            "Gasto"
         ])
         self.combo_filtro.setStyleSheet("""
             QComboBox {
@@ -87,20 +90,18 @@ class TelaDashboard(QWidget):
         grid_cards = QGridLayout()
         grid_cards.setSpacing(20)
 
-        self.card_lucro_diario = CardMetrica("Lucro Hoje", "R$ 0.00")
-        self.card_lucro_mensal = CardMetrica("Lucro Mensal", "R$ 0.00")
+        self.card_lucro_diario = CardMetrica("Resultado Hoje", "R$ 0.00")
+        self.card_lucro_mensal = CardMetrica("Resultado Mensal", "R$ 0.00")
         self.card_media_diaria = CardMetrica("Média Diária", "R$ 0.00")
-        self.card_media_proc = CardMetrica("Média / Proced", "R$ 0.00")
-        self.card_proc_hoje = CardMetrica("Procedimentos Hoje", "0")
+        self.card_proc_hoje = CardMetrica("Movim. Hoje", "0")
         # Freebet em aberto voltou a ser Quantidade
         self.card_freebets = CardMetrica("Freebets (Em Aberto)", "0", "#a855f7") 
 
         grid_cards.addWidget(self.card_lucro_diario, 0, 0)
         grid_cards.addWidget(self.card_lucro_mensal, 0, 1)
         grid_cards.addWidget(self.card_media_diaria, 0, 2)
-        grid_cards.addWidget(self.card_media_proc, 1, 0)
-        grid_cards.addWidget(self.card_proc_hoje, 1, 1)
-        grid_cards.addWidget(self.card_freebets, 1, 2)
+        grid_cards.addWidget(self.card_proc_hoje, 1, 0)
+        grid_cards.addWidget(self.card_freebets, 1, 1)
 
         layout_principal.addLayout(grid_cards)
 
@@ -132,7 +133,7 @@ class TelaDashboard(QWidget):
         self.abas_graficos.addTab(self.criar_aba_padrao(self.grafico_linha), "Evolução Mensal")
 
         self.grafico_barra_lucro = self.criar_grafico()
-        self.abas_graficos.addTab(self.criar_aba_padrao(self.grafico_barra_lucro), "Lucro Diário")
+        self.abas_graficos.addTab(self.criar_aba_padrao(self.grafico_barra_lucro), "Resultado Diário")
 
         self.grafico_barra_vol = self.criar_grafico()
         self.abas_graficos.addTab(self.criar_aba_padrao(self.grafico_barra_vol), "Volume Diário")
@@ -406,7 +407,6 @@ class TelaDashboard(QWidget):
         self.card_lucro_mensal.lbl_valor.setStyleSheet(f"color: {cor_up if lucro_mensal >= 0 else cor_down}; font-size: 28px; font-weight: bold; border: none;")
 
         self.card_media_diaria.lbl_valor.setText(f"R$ {(lucro_mensal / dia_atual):.2f}")
-        self.card_media_proc.lbl_valor.setText(f"R$ {(lucro_mensal / len(registros)) if registros else 0:.2f}")
         self.card_proc_hoje.lbl_valor.setText(str(proc_hoje))
         
         # Freebets em aberto atualizado

@@ -27,7 +27,7 @@ def resource_path(relative_path):
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Gerenciador de Procedimentos")
+        self.setWindowTitle("Gerenciador Financeiro")
         self.resize(1200, 800) 
         
         central_widget = QWidget()
@@ -44,7 +44,7 @@ class MainWindow(QMainWindow):
         top_bar_layout.setSpacing(10)
 
         self.btn_dashboard = QPushButton("Dashboard")
-        self.btn_procedimentos = QPushButton("Procedimentos")
+        self.btn_procedimentos = QPushButton("Movimentações")
         self.btn_freebets = QPushButton("Freebets")
         self.btn_casas = QPushButton("Bancas")
         self.btn_calculadora = QPushButton("Calculadora")

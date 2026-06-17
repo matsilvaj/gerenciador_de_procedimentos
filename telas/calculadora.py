@@ -169,11 +169,11 @@ class TelaCalculadora(QWidget):
         self.layout_container.addWidget(grupo_sure)
 
     def atualizar_indicador_adv(self, idx):
-        """Muda o estilo do botão ▼ se houver opções avançadas ativas na linha"""
+        """Muda o estilo do botao avancado se houver opcoes ativas na linha."""
         l = self.linhas_sure[idx]
         tem_algo = bool(l["inp_aum"].text().strip() or l["inp_com"].text().strip() or l["inp_cash"].text().strip() or l["chk_fb"].isChecked())
    
-        sinal = "▲" if l["container_adv"].isVisible() else "▼"
+        sinal = "^" if l["container_adv"].isVisible() else "v"
         
         l["btn_adv"].setText(f"{sinal}" if tem_algo else sinal)
         if tem_algo:
@@ -303,7 +303,7 @@ class TelaCalculadora(QWidget):
             btn_tipo.setStyleSheet("background-color: #3b82f6; color: white; border-radius: 6px; font-weight: bold; font-size: 16px;")
             btn_tipo.setCursor(Qt.PointingHandCursor)
             
-            btn_adv = QPushButton("▼")
+            btn_adv = QPushButton("v")
             btn_adv.setFixedSize(35, 40)
             btn_adv.setStyleSheet("background-color: transparent; color: #a1a1aa; font-size: 12px; border: 1px solid rgba(255,255,255,0.1); border-radius: 6px;")
             btn_adv.setCursor(Qt.PointingHandCursor)
@@ -600,13 +600,11 @@ class TelaCalculadora(QWidget):
                     s_final = float(l["stake"].text().replace(',', '.'))
            
                 else:
-                    if c["is_lay"]: s_final = round(stakes[i], 2)
-                    else: s_final = float(int(round(stakes[i])))
+                    s_final = round(stakes[i], 2)
                 
                 if i != b_idx and not stake_digitada: 
            
-                    if c["is_lay"]: l["stake"].setText(f"{s_final:.2f}")
-                    else: l["stake"].setText(f"{int(s_final)}")
+                    l["stake"].setText(f"{s_final:.2f}")
                     
                 if c["is_lay"]: 
                     l["inp_resp"].setText(f"{s_final * c['o_eff'] - s_final:.2f}")
@@ -711,7 +709,7 @@ class TelaCalculadora(QWidget):
                     database.salvar_procedimento(dialog.dados_finais)
          
                 
-                mensagem = "Procedimento salvo com sucesso.\nEle já aparecerá na aba de Procedimentos."
+                mensagem = "Procedimento salvo com sucesso.\nEle já aparecerá na aba de Movimentações."
                 casas_adicionadas = adicionar_casas_a_bancas(dialog.dados_finais.get('casas_envolvidas', ''))
                 if casas_adicionadas:
                     mensagem += "\n" + montar_mensagem_casas_adicionadas(casas_adicionadas)

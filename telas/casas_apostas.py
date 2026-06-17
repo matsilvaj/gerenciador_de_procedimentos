@@ -6,13 +6,21 @@ from PySide6.QtCore import Qt, QSettings
 from core import database
 
 def carregar_casas_ativas():
+    casas_db = database.listar_casas_ativas()
+    if casas_db:
+        return casas_db
+
     settings = QSettings("GerenciadorProcedimentos", "Bancas")
     casas_ativas = settings.value("casas_ativas", [])
     if casas_ativas is None:
         return []
     if isinstance(casas_ativas, str):
-        return [casas_ativas] if casas_ativas.strip() else []
-    return [str(casa).strip() for casa in casas_ativas if str(casa).strip()]
+        casas_ativas = [casas_ativas] if casas_ativas.strip() else []
+
+    casas_migradas = [str(casa).strip() for casa in casas_ativas if str(casa).strip()]
+    for casa in casas_migradas:
+        database.definir_casa_ativa(casa, True)
+    return casas_migradas
 
 def normalizar_casas(casas):
     if isinstance(casas, str):
@@ -37,22 +45,18 @@ def adicionar_casas_a_bancas(casas):
     if not nomes:
         return []
 
-    settings = QSettings("GerenciadorProcedimentos", "Bancas")
     casas_ativas = carregar_casas_ativas()
     casas_ativas_normalizadas = {casa.lower() for casa in casas_ativas}
     casas_adicionadas = []
 
     for nome in nomes:
-        database.adicionar_casa(nome)
         if nome.lower() in casas_ativas_normalizadas:
             continue
 
+        database.definir_casa_ativa(nome, True)
         casas_ativas.append(nome)
         casas_ativas_normalizadas.add(nome.lower())
         casas_adicionadas.append(nome)
-
-    if casas_adicionadas:
-        settings.setValue("casas_ativas", casas_ativas)
 
     return casas_adicionadas
 
@@ -66,7 +70,6 @@ class TelaCasasApostas(QWidget):
     def __init__(self):
         super().__init__()
         
-        self.settings = QSettings("GerenciadorProcedimentos", "Bancas")
         self.casas_ativas = carregar_casas_ativas()
 
         layout = QVBoxLayout(self)
@@ -154,14 +157,14 @@ class TelaCasasApostas(QWidget):
 
         # Se for casa nova, salva no banco e atualiza o autocomplete
         if nova_casa:
-            database.adicionar_casa(nome_escolhido)
+            database.definir_casa_ativa(nome_escolhido, True)
             self.lista_casas_db = database.listar_casas()
             self.completer.model().setStringList(self.lista_casas_db)
 
         # Adiciona na grade se já não estiver ativada
         if nome_escolhido not in self.casas_ativas:
+            database.definir_casa_ativa(nome_escolhido, True)
             self.casas_ativas.append(nome_escolhido)
-            self.settings.setValue("casas_ativas", self.casas_ativas)
             self.renderizar_grid()
                 
         self.input_add.clear()
@@ -169,7 +172,7 @@ class TelaCasasApostas(QWidget):
     def remover_casa(self, nome):
         if nome in self.casas_ativas:
             self.casas_ativas.remove(nome)
-            self.settings.setValue("casas_ativas", self.casas_ativas)
+            database.definir_casa_ativa(nome, False)
             self.renderizar_grid()
 
     def renderizar_grid(self):

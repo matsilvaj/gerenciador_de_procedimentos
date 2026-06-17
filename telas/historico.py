@@ -35,7 +35,7 @@ class TelaHistorico(QWidget):
         layout_resumo = QVBoxLayout(self.card_resumo)
         layout_resumo.setContentsMargins(20,20,20,20)
         
-        lbl_desc = QLabel("LUCRO NO PERÍODO")
+        lbl_desc = QLabel("RESULTADO NO PERÍODO")
         lbl_desc.setStyleSheet("color: #71717a; font-size: 13px; font-weight: bold;")
         lbl_desc.setAlignment(Qt.AlignCenter)
         
@@ -47,7 +47,7 @@ class TelaHistorico(QWidget):
         layout.addWidget(self.card_resumo)
 
         self.tabela = TabelaProcedimentos(0, 6)
-        self.tabela.setHorizontalHeaderLabels(["Data", "Tipo", "Jogo", "Casas", "Lucro Base", "Lucro Final"])
+        self.tabela.setHorizontalHeaderLabels(["Data", "Tipo", "Evento", "Casas", "Resultado Base", "Resultado Final"])
         self.tabela.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.tabela.verticalHeader().setVisible(False)
         self.tabela.verticalHeader().setDefaultSectionSize(75)

@@ -13,7 +13,8 @@ def criar_tabelas():
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS Casas_de_Apostas (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        nome TEXT NOT NULL UNIQUE
+        nome TEXT NOT NULL UNIQUE,
+        ativo BOOLEAN DEFAULT 0
     )
     """)
 
@@ -57,7 +58,9 @@ def atualizar_schema():
     colunas_casas = [col[1] for col in cursor.fetchall()]
     if 'saldo' not in colunas_casas:
         cursor.execute("ALTER TABLE Casas_de_Apostas ADD COLUMN saldo REAL DEFAULT 0.0")
-    
+    if 'ativo' not in colunas_casas:
+        cursor.execute("ALTER TABLE Casas_de_Apostas ADD COLUMN ativo BOOLEAN DEFAULT 0")
+
     conexao.commit()
     conexao.close()
 
@@ -107,10 +110,26 @@ def adicionar_casa(nome_casa):
     finally:
         conexao.close()
 
+def definir_casa_ativa(nome_casa, ativo=True):
+    adicionar_casa(nome_casa)
+    conexao = conectar()
+    cursor = conexao.cursor()
+    cursor.execute("UPDATE Casas_de_Apostas SET ativo = ? WHERE nome = ?", (1 if ativo else 0, nome_casa))
+    conexao.commit()
+    conexao.close()
+
 def listar_casas():
     conexao = conectar()
     cursor = conexao.cursor()
     cursor.execute("SELECT nome FROM Casas_de_Apostas ORDER BY nome ASC")
+    casas = [linha[0] for linha in cursor.fetchall()]
+    conexao.close()
+    return casas
+
+def listar_casas_ativas():
+    conexao = conectar()
+    cursor = conexao.cursor()
+    cursor.execute("SELECT nome FROM Casas_de_Apostas WHERE ativo = 1 ORDER BY nome ASC")
     casas = [linha[0] for linha in cursor.fetchall()]
     conexao.close()
     return casas

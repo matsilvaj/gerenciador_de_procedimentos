@@ -1,12 +1,13 @@
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QTableWidget,
-    QTableWidgetItem, QHeaderView, QPushButton, QTabWidget, QComboBox
+    QTableWidgetItem, QHeaderView, QPushButton, QTabWidget, QComboBox,
+    QDialog, QDialogButtonBox, QAbstractItemView
 )
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QColor, QBrush
 
 from core import database
-from telas.procedimentos import TabelaProcedimentos
+from telas.procedimentos import DialogNovoProcedimento, TabelaProcedimentos
 
 COR_VERDE = "#34d399"
 COR_VERMELHO = "#f87171"
@@ -24,12 +25,83 @@ class ComboBoxContainer(QWidget):
         layout.addWidget(self.combo)
 
 
+class DialogSelecionarFreebet(QDialog):
+    def __init__(self, freebets, parent=None):
+        super().__init__(parent)
+        self.freebets = freebets
+        self.id_selecionado = None
+        self.setWindowTitle("Selecionar Freebet")
+        self.setMinimumWidth(560)
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(18, 18, 18, 18)
+        layout.setSpacing(12)
+
+        titulo = QLabel("Escolha qual freebet deseja editar")
+        titulo.setStyleSheet("font-size: 16px; font-weight: bold; color: #f4f4f5;")
+        layout.addWidget(titulo)
+
+        self.tabela = QTableWidget(0, 3)
+        self.tabela.setHorizontalHeaderLabels(["Evento", "Valor FB", "Resultado Final"])
+        self.tabela.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.tabela.verticalHeader().setVisible(False)
+        self.tabela.setEditTriggers(QTableWidget.NoEditTriggers)
+        self.tabela.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.tabela.setSelectionMode(QAbstractItemView.SingleSelection)
+        self.tabela.setShowGrid(False)
+        self.tabela.setStyleSheet("""
+            QTableWidget { background-color: #111113; color: #f4f4f5; border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; outline: none; }
+            QTableWidget::item { border: none; border-bottom: 1px solid rgba(255,255,255,0.04); padding: 8px; }
+            QTableWidget::item:selected { background-color: #27272a; color: #f4f4f5; }
+            QHeaderView::section { background-color: #18181b; color: #a1a1aa; border: none; padding: 10px 8px; font-weight: bold; }
+        """)
+        self.tabela.cellDoubleClicked.connect(lambda row, _col: self.selecionar_linha(row))
+        layout.addWidget(self.tabela)
+
+        botoes = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        botoes.button(QDialogButtonBox.Ok).setText("Editar")
+        botoes.button(QDialogButtonBox.Cancel).setText("Cancelar")
+        botoes.accepted.connect(self.confirmar)
+        botoes.rejected.connect(self.reject)
+        layout.addWidget(botoes)
+
+        self.carregar()
+
+    def criar_item(self, texto):
+        item = QTableWidgetItem(str(texto))
+        item.setTextAlignment(Qt.AlignCenter)
+        return item
+
+    def carregar(self):
+        for row, freebet in enumerate(self.freebets):
+            self.tabela.insertRow(row)
+            self.tabela.setItem(row, 0, self.criar_item(freebet.get("evento") or "Sem evento"))
+            self.tabela.setItem(row, 1, self.criar_item(f"R$ {freebet.get('valor_fb', 0.0):.2f}"))
+            self.tabela.setItem(row, 2, self.criar_item(f"R$ {freebet.get('resultado_final', 0.0):.2f}"))
+            self.tabela.item(row, 0).setData(Qt.UserRole, freebet["id"])
+
+        if self.freebets:
+            self.tabela.selectRow(0)
+
+    def selecionar_linha(self, row):
+        item = self.tabela.item(row, 0)
+        if item:
+            self.id_selecionado = item.data(Qt.UserRole)
+            self.accept()
+
+    def confirmar(self):
+        row = self.tabela.currentRow()
+        if row >= 0:
+            self.selecionar_linha(row)
+
+
 class TelaFreebets(QWidget):
     sinal_converter_calculadora = Signal(str, float, list)
 
     def __init__(self):
         super().__init__()
         self.historico_desfazer = []
+        self.freebets_por_linha = {}
         layout = QVBoxLayout(self)
         layout.setContentsMargins(40, 30, 40, 40)
 
@@ -70,6 +142,7 @@ class TelaFreebets(QWidget):
         self.tab_ativas = TabelaProcedimentos(0, 6)
         self.tab_ativas.setHorizontalHeaderLabels(["Data / Qtd", "Casa", "Valor FB", "Lucro Base", "Ganhou?", ""])
         self.configurar_tabela(self.tab_ativas, tem_acao=True, tem_resultado=True)
+        self.tab_ativas.cellClicked.connect(self.editar_freebet_da_linha)
         layout_disp.addWidget(self.tab_ativas)
         self.abas.addTab(aba_disponiveis, "Dispon\u00edveis")
 
@@ -79,6 +152,7 @@ class TelaFreebets(QWidget):
         self.tab_convertidas = TabelaProcedimentos(0, 6)
         self.tab_convertidas.setHorizontalHeaderLabels(["Data (Col \u2794 Conv)", "Casa", "Valor FB", "Lucro Base", "Lucro Final", "Total"])
         self.configurar_tabela(self.tab_convertidas)
+        self.tab_convertidas.cellClicked.connect(self.editar_freebet_da_linha)
         layout_conv.addWidget(self.tab_convertidas)
         self.abas.addTab(aba_convertidas, "Hist\u00f3rico")
 
@@ -124,6 +198,13 @@ class TelaFreebets(QWidget):
             fonte.setBold(True)
             item.setFont(fonte)
         return item
+
+    def registrar_freebets_linha(self, tabela, row, freebets):
+        self.freebets_por_linha[(id(tabela), row)] = freebets
+        for col in range(tabela.columnCount()):
+            item = tabela.item(row, col)
+            if item:
+                item.setToolTip("Clique para editar")
 
     def texto_qtd_itens(self, quantidade):
         return f"{quantidade} item" if quantidade == 1 else f"{quantidade} itens"
@@ -171,6 +252,59 @@ class TelaFreebets(QWidget):
             lambda texto, procedimento_id=id_op: self.atualizar_resultado_ganhou(procedimento_id, texto)
         )
         return ComboBoxContainer(combo)
+
+    def editar_freebet_da_linha(self, row, _col):
+        tabela = self.sender()
+        freebets = self.freebets_por_linha.get((id(tabela), row), [])
+        if not freebets:
+            return
+
+        if len(freebets) == 1:
+            self.editar_procedimento(freebets[0]["id"])
+            return
+
+        dialog = DialogSelecionarFreebet(freebets, self)
+        if dialog.exec() and dialog.id_selecionado:
+            self.editar_procedimento(dialog.id_selecionado)
+
+    def buscar_dados_edicao(self, id_op):
+        conexao = database.conectar()
+        cursor = conexao.cursor()
+        cursor.execute("""
+            SELECT tipo_procedimento, jogo_time_pa, casas_envolvidas, lucro_final,
+                   valor_freebet_coletada, observacao, condicao_freebet,
+                   casa_destino_freebet, valor_da_freebet
+            FROM Procedimentos_Historico
+            WHERE id = ?
+        """, (id_op,))
+        linha = cursor.fetchone()
+        conexao.close()
+
+        if not linha:
+            return None
+
+        tipo, jogo, casas, lucro, v_duplo, obs, cond, casa_fb, v_fb = linha
+        return {
+            'tipo': tipo,
+            'jogo': jogo,
+            'casas': casas,
+            'lucro_base': lucro,
+            'v_duplo': v_duplo,
+            'obs': obs,
+            'condicao': cond,
+            'casa_fb': casa_fb,
+            'v_fb': v_fb,
+        }
+
+    def editar_procedimento(self, id_op):
+        dados_edicao = self.buscar_dados_edicao(id_op)
+        if not dados_edicao:
+            return
+
+        dialog = DialogNovoProcedimento(self, dados_edicao)
+        if dialog.exec():
+            database.atualizar_procedimento(id_op, dialog.dados_finais)
+            self.carregar_freebets_ativas()
 
     def atualizar_resultado_ganhou(self, id_op, resultado):
         if resultado not in [RESULTADO_SIM, RESULTADO_NAO]:
@@ -230,11 +364,12 @@ class TelaFreebets(QWidget):
 
     def carregar_freebets_ativas(self):
         self.tab_ativas.setRowCount(0)
+        self.freebets_por_linha = {}
         conexao = database.conectar()
         cursor = conexao.cursor()
         cursor.execute("""
-            SELECT id, data_operacao, casa_destino_freebet, valor_da_freebet, lucro_final,
-                   bateu_duplo, valor_freebet_coletada, condicao_freebet, ganhou_freebet
+            SELECT id, data_operacao, jogo_time_pa, casa_destino_freebet, valor_da_freebet,
+                   lucro_final, bateu_duplo, valor_freebet_coletada, condicao_freebet, ganhou_freebet
             FROM Procedimentos_Historico
             WHERE tipo_procedimento = 'Coletar Freebet' AND status_freebet = 'Pendente'
             ORDER BY id DESC
@@ -243,7 +378,7 @@ class TelaFreebets(QWidget):
         pendentes_confirmacao = []
         agrupadas_convertiveis = {}
 
-        for id_op, data, casa, valor_fb, lucro_base, bateu, v_duplo, condicao, ganhou in cursor.fetchall():
+        for id_op, data, evento, casa, valor_fb, lucro_base, bateu, v_duplo, condicao, ganhou in cursor.fetchall():
             valor_fb = valor_fb or 0.0
             lucro_base = lucro_base or 0.0
             v_duplo = v_duplo or 0.0
@@ -257,10 +392,12 @@ class TelaFreebets(QWidget):
                 pendentes_confirmacao.append({
                     "id": id_op,
                     "data": data,
+                    "evento": evento,
                     "casa": casa_exibicao,
                     "valor_fb": valor_fb,
                     "lucro_real": lucro_real,
                     "ganhou": ganhou,
+                    "resultado_final": lucro_real,
                 })
                 continue
 
@@ -269,8 +406,15 @@ class TelaFreebets(QWidget):
                 "quantidade": 0,
                 "valor_total": 0.0,
                 "lucro_total": 0.0,
+                "eventos": [],
             })
             grupo["ids"].append(id_op)
+            grupo["eventos"].append({
+                "id": id_op,
+                "evento": evento,
+                "valor_fb": valor_fb,
+                "resultado_final": lucro_real,
+            })
             grupo["quantidade"] += 1
             grupo["valor_total"] += valor_fb
             grupo["lucro_total"] += lucro_real
@@ -289,6 +433,16 @@ class TelaFreebets(QWidget):
             )
             self.tab_ativas.setCellWidget(row, 4, self.criar_combo_resultado(pendente["id"], pendente["ganhou"]))
             self.tab_ativas.setCellWidget(row, 5, self.criar_container_vazio())
+            self.registrar_freebets_linha(
+                self.tab_ativas,
+                row,
+                [{
+                    "id": pendente["id"],
+                    "evento": pendente["evento"],
+                    "valor_fb": pendente["valor_fb"],
+                    "resultado_final": pendente["resultado_final"],
+                }]
+            )
             row += 1
 
         for casa_exibicao, grupo in agrupadas_convertiveis.items():
@@ -306,6 +460,7 @@ class TelaFreebets(QWidget):
             self.tab_ativas.setCellWidget(
                 row, 5, self.criar_botao_converter(casa_exibicao, grupo["valor_total"], grupo["ids"])
             )
+            self.registrar_freebets_linha(self.tab_ativas, row, grupo["eventos"])
             row += 1
 
         conexao.close()
@@ -317,7 +472,8 @@ class TelaFreebets(QWidget):
         cursor = conexao.cursor()
 
         cursor.execute("""
-            SELECT c.data_operacao, v.data_operacao, c.casa_destino_freebet, c.valor_da_freebet,
+            SELECT c.id, c.data_operacao, v.data_operacao, c.jogo_time_pa,
+                   c.casa_destino_freebet, c.valor_da_freebet,
                    c.lucro_final, c.bateu_duplo, c.valor_freebet_coletada, v.lucro_final,
                    v.valor_da_freebet, v.bateu_duplo, v.valor_freebet_coletada,
                    c.status_freebet, c.ganhou_freebet
@@ -328,7 +484,7 @@ class TelaFreebets(QWidget):
             ORDER BY c.id DESC
         """)
 
-        for row, (data_col, data_conv, casa, v_fb_col, l_col_base, b_col, v_dup_col, l_conv_base, v_fb_conv, b_conv, v_dup_conv, status_fb, ganhou) in enumerate(cursor.fetchall()):
+        for row, (id_col, data_col, data_conv, evento, casa, v_fb_col, l_col_base, b_col, v_dup_col, l_conv_base, v_fb_conv, b_conv, v_dup_conv, status_fb, ganhou) in enumerate(cursor.fetchall()):
             self.tab_convertidas.insertRow(row)
 
             v_fb_col = v_fb_col or 0.0
@@ -377,6 +533,16 @@ class TelaFreebets(QWidget):
                     COR_VERDE if lucro_total >= 0 else COR_VERMELHO,
                     bold=True
                 )
+            )
+            self.registrar_freebets_linha(
+                self.tab_convertidas,
+                row,
+                [{
+                    "id": id_col,
+                    "evento": evento,
+                    "valor_fb": v_fb_col,
+                    "resultado_final": lucro_total,
+                }]
             )
 
         conexao.close()
