@@ -393,7 +393,7 @@ class TelaDashboard(QWidget):
             elif slice.label() == "Gastos":
                 for k, v in self.gastos_detalhes.items(): texto += f"<br>• {k}: R$ {v:.2f}"
             elif slice.label() == "Investimento":
-                texto += f"<br>• Total Investido no Mês: R$ {slice.value():.2f}"
+                texto += f"<br>• Total Investido: R$ {slice.value():.2f}"
 
             self.chart_view.setStyleSheet("QToolTip { background-color: #18181b; color: #f4f4f5; border: 1px solid #3b82f6; border-radius: 8px; padding: 10px; font-size: 13px; }")
             QToolTip.showText(QCursor.pos(), texto, self.chart_view)
