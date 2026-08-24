@@ -11,7 +11,10 @@ from telas.casas_apostas import TelaCasasApostas
 from telas.calculadora import TelaCalculadora
 from core import database
 from core import tema
+from core import diagnostico
 from PySide6.QtGui import QIcon, QKeySequence, QShortcut
+
+diagnostico.ativar()
 
 database.criar_tabelas()
 database.atualizar_schema()
@@ -129,4 +132,6 @@ if __name__ == "__main__":
     app.setWindowIcon(QIcon(resource_path("icon/icon.ico")))
     window = MainWindow()
     window.show()
-    sys.exit(app.exec())
+    codigo = app.exec()
+    diagnostico.registrar_encerramento(codigo)
+    sys.exit(codigo)
