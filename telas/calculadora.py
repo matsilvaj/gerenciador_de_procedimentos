@@ -7,7 +7,10 @@ from PySide6.QtCore import Qt, Signal
 from telas.procedimentos import DialogNovoProcedimento
 from telas.casas_apostas import adicionar_casas_a_bancas, montar_mensagem_casas_adicionadas
 from telas.notificacoes import mostrar_notificacao
+import traceback
+
 from core import database
+from core import diagnostico
 from core import tema
 
 COR_LAY = "#ec4899"
@@ -744,6 +747,8 @@ class TelaCalculadora(QWidget):
 
                 mostrar_notificacao(self, "Procedimento salvo", mensagem)
         except Exception:
+            # O erro real ia para o vazio; agora fica registrado no log.
+            diagnostico.registrar("Erro ao criar procedimento", traceback.format_exc())
             QMessageBox.warning(self, "Erro", "Houve um problema ao criar o procedimento. Verifique os valores.")
 
     def setup_secao_media(self):
