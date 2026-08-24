@@ -95,6 +95,127 @@ class DialogSelecionarFreebet(QDialog):
             self.selecionar_linha(row)
 
 
+class DialogSelecionarConversao(QDialog):
+    """Permite escolher quais freebets do grupo serao convertidas."""
+
+    def __init__(self, casa, freebets, parent=None):
+        super().__init__(parent)
+        self.freebets = freebets
+        self.ids_selecionados = []
+        self.valor_selecionado = 0.0
+        self.setWindowTitle("Selecionar Freebets para Converter")
+        self.setMinimumWidth(560)
+        self.setStyleSheet("QDialog { background-color: #09090b; } QLabel { color: #f4f4f5; }")
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(18, 18, 18, 18)
+        layout.setSpacing(12)
+
+        titulo = QLabel(f"Quais freebets de {casa} voce quer converter?")
+        titulo.setStyleSheet("font-size: 16px; font-weight: bold; color: #f4f4f5;")
+        layout.addWidget(titulo)
+
+        subtitulo = QLabel("Marque uma ou mais freebets. O valor total sera enviado para a calculadora.")
+        subtitulo.setStyleSheet("font-size: 12px; color: #a1a1aa;")
+        layout.addWidget(subtitulo)
+
+        self.tabela = QTableWidget(0, 3)
+        self.tabela.setHorizontalHeaderLabels(["Evento", "Valor FB", "Resultado Final"])
+        self.tabela.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.tabela.verticalHeader().setVisible(False)
+        self.tabela.setEditTriggers(QTableWidget.NoEditTriggers)
+        self.tabela.setSelectionMode(QAbstractItemView.NoSelection)
+        self.tabela.setShowGrid(False)
+        self.tabela.setStyleSheet("""
+            QTableWidget { background-color: #111113; color: #f4f4f5; border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; outline: none; }
+            QTableWidget::item { border: none; border-bottom: 1px solid rgba(255,255,255,0.04); padding: 8px; }
+            QHeaderView::section { background-color: #18181b; color: #a1a1aa; border: none; padding: 10px 8px; font-weight: bold; }
+        """)
+        self.tabela.itemChanged.connect(self.atualizar_resumo)
+        layout.addWidget(self.tabela)
+
+        linha_acoes = QHBoxLayout()
+        btn_todas = QPushButton("Selecionar todas")
+        btn_nenhuma = QPushButton("Limpar selecao")
+        estilo_link = """
+            QPushButton { background-color: transparent; color: #71717a; font-weight: bold; font-size: 12px; border: none; }
+            QPushButton:hover { color: #f4f4f5; }
+        """
+        for botao in (btn_todas, btn_nenhuma):
+            botao.setCursor(Qt.PointingHandCursor)
+            botao.setStyleSheet(estilo_link)
+        btn_todas.clicked.connect(lambda: self.marcar_todas(True))
+        btn_nenhuma.clicked.connect(lambda: self.marcar_todas(False))
+
+        self.lbl_resumo = QLabel("")
+        self.lbl_resumo.setStyleSheet("color: #a1a1aa; font-size: 13px; font-weight: bold;")
+
+        linha_acoes.addWidget(btn_todas)
+        linha_acoes.addWidget(btn_nenhuma)
+        linha_acoes.addStretch()
+        linha_acoes.addWidget(self.lbl_resumo)
+        layout.addLayout(linha_acoes)
+
+        self.botoes = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        self.botoes.button(QDialogButtonBox.Ok).setText("Converter")
+        self.botoes.button(QDialogButtonBox.Cancel).setText("Cancelar")
+        self.botoes.accepted.connect(self.confirmar)
+        self.botoes.rejected.connect(self.reject)
+        layout.addWidget(self.botoes)
+
+        self.carregar()
+
+    def criar_item(self, texto):
+        item = QTableWidgetItem(str(texto))
+        item.setTextAlignment(Qt.AlignCenter)
+        return item
+
+    def carregar(self):
+        self.tabela.blockSignals(True)
+        for row, freebet in enumerate(self.freebets):
+            self.tabela.insertRow(row)
+            item_evento = self.criar_item(freebet.get("evento") or "Sem evento")
+            item_evento.setFlags(item_evento.flags() | Qt.ItemIsUserCheckable)
+            item_evento.setCheckState(Qt.Unchecked)
+            item_evento.setData(Qt.UserRole, freebet["id"])
+            item_evento.setTextAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+            self.tabela.setItem(row, 0, item_evento)
+            self.tabela.setItem(row, 1, self.criar_item(f"R$ {freebet.get('valor_fb', 0.0):.2f}"))
+            self.tabela.setItem(row, 2, self.criar_item(f"R$ {freebet.get('resultado_final', 0.0):.2f}"))
+        self.tabela.blockSignals(False)
+        self.atualizar_resumo()
+
+    def marcar_todas(self, marcar):
+        self.tabela.blockSignals(True)
+        for row in range(self.tabela.rowCount()):
+            self.tabela.item(row, 0).setCheckState(Qt.Checked if marcar else Qt.Unchecked)
+        self.tabela.blockSignals(False)
+        self.atualizar_resumo()
+
+    def coletar_selecao(self):
+        ids = []
+        valor = 0.0
+        for row in range(self.tabela.rowCount()):
+            item = self.tabela.item(row, 0)
+            if item and item.checkState() == Qt.Checked:
+                ids.append(item.data(Qt.UserRole))
+                valor += self.freebets[row].get("valor_fb", 0.0)
+        return ids, valor
+
+    def atualizar_resumo(self, *_):
+        ids, valor = self.coletar_selecao()
+        self.lbl_resumo.setText(f"{len(ids)} selecionada(s) - R$ {valor:.2f}")
+        self.botoes.button(QDialogButtonBox.Ok).setEnabled(bool(ids))
+
+    def confirmar(self):
+        ids, valor = self.coletar_selecao()
+        if not ids:
+            return
+        self.ids_selecionados = ids
+        self.valor_selecionado = valor
+        self.accept()
+
+
 class TelaFreebets(QWidget):
     sinal_converter_calculadora = Signal(str, float, list)
 
@@ -215,7 +336,7 @@ class TelaFreebets(QWidget):
         layout.setContentsMargins(5, 2, 5, 2)
         return container
 
-    def criar_botao_converter(self, casa, valor, ids):
+    def criar_botao_converter(self, casa, valor, freebets):
         container_btn = QWidget()
         lay_btn = QHBoxLayout(container_btn)
         lay_btn.setContentsMargins(5, 2, 5, 2)
@@ -227,10 +348,24 @@ class TelaFreebets(QWidget):
             QPushButton:hover { background-color: #d4d4d8; }
         """)
         btn_usar.clicked.connect(
-            lambda _, c=casa, v=valor, ids_origem=ids: self.sinal_converter_calculadora.emit(c, v, ids_origem)
+            lambda _, c=casa, v=valor, fbs=list(freebets): self.iniciar_conversao(c, v, fbs)
         )
         lay_btn.addWidget(btn_usar)
         return container_btn
+
+    def iniciar_conversao(self, casa, valor_total, freebets):
+        if len(freebets) <= 1:
+            ids = [fb["id"] for fb in freebets]
+            if not ids:
+                return
+            self.sinal_converter_calculadora.emit(casa, valor_total, ids)
+            return
+
+        dialog = DialogSelecionarConversao(casa, freebets, self)
+        if dialog.exec() and dialog.ids_selecionados:
+            self.sinal_converter_calculadora.emit(
+                casa, dialog.valor_selecionado, dialog.ids_selecionados
+            )
 
     def criar_combo_resultado(self, id_op, valor_atual):
         combo = QComboBox()
@@ -458,7 +593,7 @@ class TelaFreebets(QWidget):
             )
             self.tab_ativas.setItem(row, 4, self.criar_item("", mostrar_hifen=False))
             self.tab_ativas.setCellWidget(
-                row, 5, self.criar_botao_converter(casa_exibicao, grupo["valor_total"], grupo["ids"])
+                row, 5, self.criar_botao_converter(casa_exibicao, grupo["valor_total"], grupo["eventos"])
             )
             self.registrar_freebets_linha(self.tab_ativas, row, grupo["eventos"])
             row += 1

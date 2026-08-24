@@ -130,6 +130,12 @@ class TelaDashboard(QWidget):
         self.tt_lucro = QLabel(self.grafico_barra_lucro); self.tt_lucro.setStyleSheet(estilo_tooltip); self.tt_lucro.hide()
         self.tt_freebet = QLabel(self.grafico_barra_freebet); self.tt_freebet.setStyleSheet(estilo_tooltip); self.tt_freebet.hide()
 
+        self.tt_pizza = QLabel(self.chart_view)
+        self.tt_pizza.setStyleSheet(estilo_tooltip)
+        self.tt_pizza.setTextFormat(Qt.RichText)
+        self.tt_pizza.setAttribute(Qt.WA_TransparentForMouseEvents, True)
+        self.tt_pizza.hide()
+
         self.hover_dot = pg.ScatterPlotItem(size=12, pen=pg.mkPen('#18181b', width=2), brush=pg.mkBrush('#3b82f6'))
         self.hover_dot.setZValue(12)
         self.grafico_linha.addItem(self.hover_dot)
@@ -142,6 +148,8 @@ class TelaDashboard(QWidget):
         self.grafico_linha.viewport().installEventFilter(self)
         self.grafico_barra_lucro.viewport().installEventFilter(self)
         self.grafico_barra_freebet.viewport().installEventFilter(self)
+        self.chart_view.viewport().installEventFilter(self)
+        self.abas_graficos.currentChanged.connect(lambda _: self.esconder_todos_tooltips())
 
         self.atualizar_dados()
 
@@ -176,10 +184,14 @@ class TelaDashboard(QWidget):
         self.tt_linha.hide()
         self.tt_lucro.hide()
         self.tt_freebet.hide()
+        if hasattr(self, 'tt_pizza'):
+            self.tt_pizza.hide()
         self.hover_dot.hide()
         QToolTip.hideText()
 
     def mostrar_hover(self, grafico, tooltip, x, y, texto, show_dot=False):
+        tooltip.setTextFormat(Qt.RichText)
+        tooltip.setAlignment(Qt.AlignCenter)
         tooltip.setText(texto)
         tooltip.adjustSize()
         vp = grafico.getPlotItem().getViewBox().mapViewToScene(pg.Point(x, y))
@@ -395,10 +407,23 @@ class TelaDashboard(QWidget):
             elif slice.label() == "Investimento":
                 texto += f"<br>• Total Investido: R$ {slice.value():.2f}"
 
-            self.chart_view.setStyleSheet("QToolTip { background-color: #18181b; color: #f4f4f5; border: 1px solid #3b82f6; border-radius: 8px; padding: 10px; font-size: 13px; }")
-            QToolTip.showText(QCursor.pos(), texto, self.chart_view)
+            self.mostrar_tooltip_pizza(texto)
         else:
-            QToolTip.hideText()
+            self.tt_pizza.hide()
+
+    def mostrar_tooltip_pizza(self, texto):
+        self.tt_pizza.setText(texto)
+        self.tt_pizza.adjustSize()
+        pos = self.chart_view.mapFromGlobal(QCursor.pos())
+        px = pos.x() + 15
+        py = pos.y() + 15
+        limite_x = self.chart_view.width() - self.tt_pizza.width() - 5
+        limite_y = self.chart_view.height() - self.tt_pizza.height() - 5
+        if px > limite_x: px = pos.x() - self.tt_pizza.width() - 15
+        if py > limite_y: py = pos.y() - self.tt_pizza.height() - 15
+        self.tt_pizza.move(max(px, 5), max(py, 5))
+        self.tt_pizza.show()
+        self.tt_pizza.raise_()
 
     def aplicar_margem_y_geral(self):
         def aplicar_margem_y(grafico, dados, aceita_negativo=True):
@@ -427,11 +452,10 @@ class TelaDashboard(QWidget):
         x = int(round(mp.x()))
         if 1 <= x <= len(self.dados_dias_linha):
             y = self.dados_linha_y[x - 1]
-            if abs(mp.y() - y) < max(max(self.dados_linha_y + [1])*0.2, 50):
-                self.tt_lucro.hide(); self.tt_freebet.hide()
-                self.mostrar_hover(self.grafico_linha, self.tt_linha, x, y, f"R$ {y:.2f}", show_dot=True)
-            else:
-                self.hover_dot.hide(); self.tt_linha.hide()
+            self.tt_lucro.hide(); self.tt_freebet.hide()
+            self.mostrar_hover(self.grafico_linha, self.tt_linha, x, y, f"Dia {x}<br>R$ {y:.2f}", show_dot=True)
+        else:
+            self.hover_dot.hide(); self.tt_linha.hide()
 
     def hover_lucro(self, pos):
         mp = self.validar_hover(self.grafico_barra_lucro, pos)
@@ -439,10 +463,10 @@ class TelaDashboard(QWidget):
         x = int(round(mp.x()))
         if 1 <= x <= len(self.dados_dias):
             y = self.dados_lucro_y[x - 1]
-            if abs(mp.x() - x) <= 0.22 and ((y >= 0 and 0 <= mp.y() <= y) or (y < 0 and y <= mp.y() <= 0)):
-                self.tt_linha.hide(); self.tt_freebet.hide(); self.hover_dot.hide()
-                self.mostrar_hover(self.grafico_barra_lucro, self.tt_lucro, x, y, f"R$ {y:.2f}")
-            else: self.tt_lucro.hide()
+            self.tt_linha.hide(); self.tt_freebet.hide(); self.hover_dot.hide()
+            self.mostrar_hover(self.grafico_barra_lucro, self.tt_lucro, x, y, f"Dia {x}<br>R$ {y:.2f}")
+        else:
+            self.tt_lucro.hide()
 
     def hover_freebet(self, pos):
         mp = self.validar_hover(self.grafico_barra_freebet, pos)
@@ -450,7 +474,8 @@ class TelaDashboard(QWidget):
         x = int(round(mp.x()))
         if 1 <= x <= len(self.dados_dias):
             y = self.dados_freebet_lucro[x - 1] if self.mostrar_valor_freebet else self.dados_freebet_qtd[x - 1]
-            if abs(mp.x() - x) <= 0.22 and ((y >= 0 and 0 <= mp.y() <= y) or (y < 0 and y <= mp.y() <= 0)):
-                self.tt_linha.hide(); self.tt_lucro.hide(); self.hover_dot.hide()
-                self.mostrar_hover(self.grafico_barra_freebet, self.tt_freebet, x, y, f"R$ {y:.2f}" if self.mostrar_valor_freebet else f"{int(y)}")
-            else: self.tt_freebet.hide()
+            self.tt_linha.hide(); self.tt_lucro.hide(); self.hover_dot.hide()
+            valor = f"R$ {y:.2f}" if self.mostrar_valor_freebet else f"{int(y)}"
+            self.mostrar_hover(self.grafico_barra_freebet, self.tt_freebet, x, y, f"Dia {x}<br>{valor}")
+        else:
+            self.tt_freebet.hide()
