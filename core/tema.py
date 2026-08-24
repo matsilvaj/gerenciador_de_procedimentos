@@ -94,6 +94,28 @@ def estilo_texto_secundario():
     return f"color: {TEXTO_SECUNDARIO}; font-size: 13px; background: transparent;"
 
 
+def estilo_tabela_cartao():
+    """Tabela dentro de um diálogo, desenhada como um bloco com borda."""
+    return f"""
+        QTableWidget {{
+            background-color: #111113;
+            color: {TEXTO};
+            border: 1px solid {BORDA};
+            border-radius: {RAIO_M}px;
+            outline: none;
+        }}
+        QTableWidget::item {{ border: none; border-bottom: 1px solid {BORDA_SUTIL}; padding: 8px; }}
+        QTableWidget::item:selected {{ background-color: {SUPERFICIE_ALTA}; color: {TEXTO}; }}
+        QHeaderView::section {{
+            background-color: {SUPERFICIE};
+            color: {TEXTO_SECUNDARIO};
+            border: none;
+            padding: 10px 8px;
+            font-weight: bold;
+        }}
+    """
+
+
 def estilo_tooltip_flutuante():
     """Tooltip desenhado como QLabel sobre os gráficos (não expira sozinho)."""
     return (
@@ -315,6 +337,21 @@ QHeaderView::section {{
 QTableCornerButton::section {{
     background-color: transparent;
     border: none;
+}}
+QTableWidget::indicator, QTableView::indicator {{
+    width: 16px;
+    height: 16px;
+    border: 1px solid {BORDA_FORTE};
+    border-radius: 4px;
+    background-color: {SUPERFICIE};
+}}
+QTableWidget::indicator:hover, QTableView::indicator:hover {{
+    border: 1px solid {AZUL};
+}}
+QTableWidget::indicator:checked, QTableView::indicator:checked {{
+    background-color: {AZUL};
+    border: 1px solid {AZUL};
+    image: url({ICONE_CHECK});
 }}
 
 /* --------------------------------------------------------------- abas --- */

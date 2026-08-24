@@ -9,10 +9,12 @@ from PySide6.QtGui import QColor, QBrush
 from datetime import datetime
 
 from core import database
+from core import tema
+from telas.componentes import AvisoTabelaVazia
 from telas.procedimentos import DialogNovoProcedimento, TabelaProcedimentos
 
-COR_VERDE = "#34d399"
-COR_VERMELHO = "#f87171"
+COR_VERDE = tema.COR_POSITIVO
+COR_VERMELHO = tema.COR_NEGATIVO
 RESULTADO_SIM = "Sim"
 RESULTADO_NAO = "N\u00e3o"
 
@@ -40,23 +42,21 @@ class DialogSelecionarFreebet(QDialog):
         layout.setSpacing(12)
 
         titulo = QLabel("Escolha qual freebet deseja editar")
-        titulo.setStyleSheet("font-size: 16px; font-weight: bold; color: #f4f4f5;")
+        titulo.setStyleSheet(f"font-size: 16px; font-weight: bold; color: {tema.TEXTO};")
         layout.addWidget(titulo)
 
         self.tabela = QTableWidget(0, 3)
         self.tabela.setHorizontalHeaderLabels(["Evento", "Valor FB", "Resultado Final"])
-        self.tabela.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        cabecalho = self.tabela.horizontalHeader()
+        cabecalho.setSectionResizeMode(0, QHeaderView.Stretch)
+        cabecalho.setSectionResizeMode(1, QHeaderView.ResizeToContents)
+        cabecalho.setSectionResizeMode(2, QHeaderView.ResizeToContents)
         self.tabela.verticalHeader().setVisible(False)
         self.tabela.setEditTriggers(QTableWidget.NoEditTriggers)
         self.tabela.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.tabela.setSelectionMode(QAbstractItemView.SingleSelection)
         self.tabela.setShowGrid(False)
-        self.tabela.setStyleSheet("""
-            QTableWidget { background-color: #111113; color: #f4f4f5; border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; outline: none; }
-            QTableWidget::item { border: none; border-bottom: 1px solid rgba(255,255,255,0.04); padding: 8px; }
-            QTableWidget::item:selected { background-color: #27272a; color: #f4f4f5; }
-            QHeaderView::section { background-color: #18181b; color: #a1a1aa; border: none; padding: 10px 8px; font-weight: bold; }
-        """)
+        self.tabela.setStyleSheet(tema.estilo_tabela_cartao())
         self.tabela.cellDoubleClicked.connect(lambda row, _col: self.selecionar_linha(row))
         layout.addWidget(self.tabela)
 
@@ -107,50 +107,44 @@ class DialogSelecionarConversao(QDialog):
         self.valor_selecionado = 0.0
         self.setWindowTitle("Selecionar Freebets para Converter")
         self.setMinimumWidth(560)
-        self.setStyleSheet("QDialog { background-color: #09090b; } QLabel { color: #f4f4f5; }")
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(18, 18, 18, 18)
         layout.setSpacing(12)
 
-        titulo = QLabel(f"Quais freebets de {casa} voce quer converter?")
-        titulo.setStyleSheet("font-size: 16px; font-weight: bold; color: #f4f4f5;")
+        titulo = QLabel(f"Quais freebets de {casa} você quer converter?")
+        titulo.setStyleSheet(f"font-size: 16px; font-weight: bold; color: {tema.TEXTO};")
         layout.addWidget(titulo)
 
-        subtitulo = QLabel("Marque uma ou mais freebets. O valor total sera enviado para a calculadora.")
-        subtitulo.setStyleSheet("font-size: 12px; color: #a1a1aa;")
+        subtitulo = QLabel("Marque uma ou mais freebets. O valor total será enviado para a calculadora.")
+        subtitulo.setStyleSheet(f"font-size: 12px; font-weight: normal; color: {tema.TEXTO_TERCIARIO};")
         layout.addWidget(subtitulo)
 
         self.tabela = QTableWidget(0, 3)
         self.tabela.setHorizontalHeaderLabels(["Evento", "Valor FB", "Resultado Final"])
-        self.tabela.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        cabecalho = self.tabela.horizontalHeader()
+        cabecalho.setSectionResizeMode(0, QHeaderView.Stretch)
+        cabecalho.setSectionResizeMode(1, QHeaderView.ResizeToContents)
+        cabecalho.setSectionResizeMode(2, QHeaderView.ResizeToContents)
         self.tabela.verticalHeader().setVisible(False)
         self.tabela.setEditTriggers(QTableWidget.NoEditTriggers)
         self.tabela.setSelectionMode(QAbstractItemView.NoSelection)
         self.tabela.setShowGrid(False)
-        self.tabela.setStyleSheet("""
-            QTableWidget { background-color: #111113; color: #f4f4f5; border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; outline: none; }
-            QTableWidget::item { border: none; border-bottom: 1px solid rgba(255,255,255,0.04); padding: 8px; }
-            QHeaderView::section { background-color: #18181b; color: #a1a1aa; border: none; padding: 10px 8px; font-weight: bold; }
-        """)
+        self.tabela.setStyleSheet(tema.estilo_tabela_cartao())
         self.tabela.itemChanged.connect(self.atualizar_resumo)
         layout.addWidget(self.tabela)
 
         linha_acoes = QHBoxLayout()
         btn_todas = QPushButton("Selecionar todas")
-        btn_nenhuma = QPushButton("Limpar selecao")
-        estilo_link = """
-            QPushButton { background-color: transparent; color: #71717a; font-weight: bold; font-size: 12px; border: none; }
-            QPushButton:hover { color: #f4f4f5; }
-        """
+        btn_nenhuma = QPushButton("Limpar seleção")
         for botao in (btn_todas, btn_nenhuma):
             botao.setCursor(Qt.PointingHandCursor)
-            botao.setStyleSheet(estilo_link)
+            botao.setProperty("variante", "fantasma")
         btn_todas.clicked.connect(lambda: self.marcar_todas(True))
         btn_nenhuma.clicked.connect(lambda: self.marcar_todas(False))
 
         self.lbl_resumo = QLabel("")
-        self.lbl_resumo.setStyleSheet("color: #a1a1aa; font-size: 13px; font-weight: bold;")
+        self.lbl_resumo.setStyleSheet(f"color: {tema.TEXTO_SECUNDARIO}; font-size: 13px; font-weight: bold;")
 
         linha_acoes.addWidget(btn_todas)
         linha_acoes.addWidget(btn_nenhuma)
@@ -206,7 +200,7 @@ class DialogSelecionarConversao(QDialog):
 
     def atualizar_resumo(self, *_):
         ids, valor = self.coletar_selecao()
-        self.lbl_resumo.setText(f"{len(ids)} selecionada(s) - R$ {valor:.2f}")
+        self.lbl_resumo.setText(f"{len(ids)} selecionada(s) · R$ {valor:.2f}")
         self.botoes.button(QDialogButtonBox.Ok).setEnabled(bool(ids))
 
     def confirmar(self):
@@ -226,38 +220,17 @@ class DialogNovaFreebet(QDialog):
         self.dados_finais = None
         self.setWindowTitle("Adicionar Freebet")
         self.setMinimumWidth(420)
-        self.setStyleSheet("""
-            QDialog { background-color: #09090b; }
-            QLabel { color: #a1a1aa; font-size: 13px; font-weight: bold; }
-            QLineEdit {
-                background-color: #18181b; color: #f4f4f5; font-size: 14px;
-                border: 1px solid rgba(255,255,255,0.06); border-radius: 8px;
-                padding: 10px 12px;
-            }
-            QLineEdit:focus { border: 1px solid #3b82f6; }
-            QComboBox {
-                background-color: #18181b; color: #f4f4f5; font-size: 14px;
-                border: 1px solid rgba(255,255,255,0.06); border-radius: 8px;
-                padding: 10px 12px;
-            }
-            QComboBox::drop-down { border: none; width: 24px; }
-            QComboBox QAbstractItemView {
-                background-color: #18181b; color: #f4f4f5;
-                border: 1px solid rgba(255,255,255,0.06);
-                selection-background-color: #27272a;
-            }
-        """)
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(20, 20, 20, 20)
         layout.setSpacing(14)
 
         titulo = QLabel("Nova Freebet")
-        titulo.setStyleSheet("font-size: 18px; font-weight: bold; color: #f4f4f5;")
+        titulo.setStyleSheet(f"font-size: 18px; font-weight: bold; color: {tema.TEXTO};")
         layout.addWidget(titulo)
 
-        subtitulo = QLabel("Informe a casa e o valor. A freebet entra como pendente e ja fica disponivel para conversao.")
-        subtitulo.setStyleSheet("font-size: 12px; font-weight: normal; color: #71717a;")
+        subtitulo = QLabel("Informe a casa e o valor. A freebet entra como pendente e já fica disponível para conversão.")
+        subtitulo.setStyleSheet(f"font-size: 12px; font-weight: normal; color: {tema.TEXTO_TERCIARIO};")
         subtitulo.setWordWrap(True)
         layout.addWidget(subtitulo)
 
@@ -312,7 +285,7 @@ class DialogNovaFreebet(QDialog):
         try:
             valor = float(texto_valor)
         except ValueError:
-            self.mostrar_erro("Valor invalido. Use apenas numeros, ex: 50,00.")
+            self.mostrar_erro("Valor inválido. Use apenas números, ex: 50,00.")
             self.input_valor.setFocus()
             return
 
@@ -354,44 +327,26 @@ class TelaFreebets(QWidget):
 
         topo = QHBoxLayout()
         titulo = QLabel("Gest\u00e3o de Freebets")
-        titulo.setStyleSheet("font-size: 22px; font-weight: bold; color: #f4f4f5;")
+        titulo.setStyleSheet(tema.estilo_titulo_tela())
         topo.addWidget(titulo)
         topo.addStretch()
 
         self.btn_adicionar = QPushButton("+ Adicionar Freebet")
         self.btn_adicionar.setCursor(Qt.PointingHandCursor)
-        self.btn_adicionar.setStyleSheet("""
-            QPushButton { background-color: #f4f4f5; color: #09090b; font-weight: bold; font-size: 13px; border-radius: 8px; padding: 9px 16px; border: none; }
-            QPushButton:hover { background-color: #d4d4d8; }
-        """)
+        self.btn_adicionar.setProperty("variante", "primario")
         self.btn_adicionar.clicked.connect(self.adicionar_freebet)
         topo.addWidget(self.btn_adicionar)
         layout.addLayout(topo)
 
         self.btn_desfazer = QPushButton("\u21b6 Desfazer mudan\u00e7a")
         self.btn_desfazer.setCursor(Qt.PointingHandCursor)
-        self.btn_desfazer.setStyleSheet("""
-            QPushButton {
-                background-color: transparent;
-                color: #71717a;
-                font-weight: bold;
-                font-size: 13px;
-                border: none;
-            }
-            QPushButton:hover {
-                color: #a1a1aa;
-            }
-        """)
+        self.btn_desfazer.setProperty("variante", "fantasma")
         self.btn_desfazer.clicked.connect(self.desfazer_ultima_acao)
         self.btn_desfazer.hide()
         layout.addWidget(self.btn_desfazer, alignment=Qt.AlignRight)
 
         self.abas = QTabWidget()
-        self.abas.setStyleSheet("""
-            QTabWidget::pane { border: none; background-color: transparent; }
-            QTabBar::tab { background: transparent; color: #71717a; padding: 10px 20px; border: none; font-weight: bold; font-size: 14px; margin-bottom: 20px; }
-            QTabBar::tab:selected { color: #3b82f6; }
-        """)
+        self.abas.setStyleSheet("QTabBar::tab { margin-bottom: 14px; }")
 
         aba_disponiveis = QWidget()
         layout_disp = QVBoxLayout(aba_disponiveis)
@@ -401,6 +356,11 @@ class TelaFreebets(QWidget):
         self.configurar_tabela(self.tab_ativas, tem_acao=True, tem_resultado=True)
         self.tab_ativas.cellClicked.connect(self.editar_freebet_da_linha)
         layout_disp.addWidget(self.tab_ativas)
+        self.aviso_ativas = AvisoTabelaVazia(
+            self.tab_ativas,
+            "Nenhuma freebet dispon\u00edvel",
+            "Use \u201c+ Adicionar Freebet\u201d para cadastrar uma e ela aparece aqui.",
+        )
         self.abas.addTab(aba_disponiveis, "Dispon\u00edveis")
 
         aba_convertidas = QWidget()
@@ -411,6 +371,11 @@ class TelaFreebets(QWidget):
         self.configurar_tabela(self.tab_convertidas)
         self.tab_convertidas.cellClicked.connect(self.editar_freebet_da_linha)
         layout_conv.addWidget(self.tab_convertidas)
+        self.aviso_convertidas = AvisoTabelaVazia(
+            self.tab_convertidas,
+            "Nenhuma freebet convertida ainda",
+            "Depois de converter uma freebet, o hist\u00f3rico dela fica registrado aqui.",
+        )
         self.abas.addTab(aba_convertidas, "Hist\u00f3rico")
 
         layout.addWidget(self.abas)
@@ -435,12 +400,9 @@ class TelaFreebets(QWidget):
         tabela.setShowGrid(False)
         tabela.setMouseTracking(True)
 
-        tabela.setStyleSheet("""
-            QTableWidget { background-color: transparent; color: #f4f4f5; border: none; outline: none; font-size: 14px; }
-            QTableWidget::item { border: none; border-bottom: 1px solid rgba(255,255,255,0.03); padding: 5px; }
-            QTableWidget::item:selected { background-color: transparent; color: #f4f4f5; border: none; }
-            QHeaderView::section { background-color: transparent; color: #71717a; font-weight: bold; border: none; border-bottom: 1px solid rgba(255,255,255,0.05); padding: 12px 8px; }
-        """)
+        tabela.setStyleSheet(
+            "QTableWidget::item:selected { background-color: transparent; color: %s; }" % tema.TEXTO
+        )
 
     def criar_item(self, texto, cor=None, bold=False, mostrar_hifen=True):
         if texto in ["None", None, ""]:
@@ -479,10 +441,8 @@ class TelaFreebets(QWidget):
 
         btn_usar = QPushButton("Converter")
         btn_usar.setCursor(Qt.PointingHandCursor)
-        btn_usar.setStyleSheet("""
-            QPushButton { background-color: #f4f4f5; color: #09090b; font-weight: bold; border-radius: 6px; padding: 4px; font-size: 12px; }
-            QPushButton:hover { background-color: #d4d4d8; }
-        """)
+        btn_usar.setProperty("variante", "primario")
+        btn_usar.setStyleSheet("padding: 6px 10px; font-size: 12px;")
         btn_usar.clicked.connect(
             lambda _, c=casa, v=valor, fbs=list(freebets): self.iniciar_conversao(c, v, fbs)
         )
@@ -520,11 +480,7 @@ class TelaFreebets(QWidget):
         combo.addItems([RESULTADO_SIM, RESULTADO_NAO])
         combo.setCursor(Qt.PointingHandCursor)
         combo.setMinimumWidth(96)
-        combo.setStyleSheet("""
-            QComboBox { background-color: #18181b; color: #f4f4f5; border: 1px solid rgba(255,255,255,0.06); border-radius: 6px; padding: 4px 10px; min-height: 28px; }
-            QComboBox::drop-down { border: none; width: 22px; }
-            QComboBox QAbstractItemView { background-color: #18181b; color: #f4f4f5; border: 1px solid rgba(255,255,255,0.06); selection-background-color: #27272a; }
-        """)
+        combo.setStyleSheet("QComboBox { padding: 4px 10px; min-height: 26px; }")
 
         if valor_atual in [RESULTADO_SIM, RESULTADO_NAO]:
             combo.setCurrentText(valor_atual)
@@ -749,6 +705,7 @@ class TelaFreebets(QWidget):
             row += 1
 
         conexao.close()
+        self.aviso_ativas.atualizar()
         self.carregar_freebets_convertidas()
 
     def carregar_freebets_convertidas(self):
@@ -831,3 +788,4 @@ class TelaFreebets(QWidget):
             )
 
         conexao.close()
+        self.aviso_convertidas.atualizar()

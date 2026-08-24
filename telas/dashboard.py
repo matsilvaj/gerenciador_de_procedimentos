@@ -9,23 +9,34 @@ import pyqtgraph as pg
 from datetime import datetime
 import calendar
 from core import database
+from core import tema
 
 class CardMetrica(QFrame):
-    def __init__(self, titulo, valor, cor_valor="#f4f4f5"):
+    """Cartao de metrica do topo do dashboard."""
+
+    def __init__(self, titulo, valor, cor_valor=tema.TEXTO):
         super().__init__()
-        self.setStyleSheet("""
-            QFrame { background-color: #18181b; border-radius: 16px; border: none; }
-        """)
+        self.setStyleSheet(tema.estilo_card())
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setContentsMargins(20, 18, 20, 18)
+        layout.setSpacing(6)
         lbl_titulo = QLabel(titulo)
-        lbl_titulo.setStyleSheet("color: #71717a; font-size: 13px; font-weight: bold; text-transform: uppercase; border: none;")
+        lbl_titulo.setStyleSheet(
+            f"color: {tema.TEXTO_TERCIARIO}; font-size: 12px; font-weight: bold; "
+            "text-transform: uppercase; letter-spacing: 0.5px; border: none; background: transparent;"
+        )
         lbl_titulo.setAlignment(Qt.AlignCenter)
         self.lbl_valor = QLabel(valor)
-        self.lbl_valor.setStyleSheet(f"color: {cor_valor}; font-size: 28px; font-weight: bold; border: none;")
         self.lbl_valor.setAlignment(Qt.AlignCenter)
         layout.addWidget(lbl_titulo)
         layout.addWidget(self.lbl_valor)
+        self.definir_valor(valor, cor_valor)
+
+    def definir_valor(self, texto, cor=tema.TEXTO, tamanho=28):
+        self.lbl_valor.setText(texto)
+        self.lbl_valor.setStyleSheet(
+            f"color: {cor}; font-size: {tamanho}px; font-weight: bold; border: none; background: transparent;"
+        )
 
 class TelaDashboard(QWidget):
     sinal_filtrar_gastos = Signal(str)
@@ -41,17 +52,14 @@ class TelaDashboard(QWidget):
         topo_layout = QHBoxLayout()
         mes_atual_nome = datetime.now().strftime("%m/%Y")
         lbl_titulo = QLabel(f"Visão Geral — {mes_atual_nome}")
-        lbl_titulo.setStyleSheet("color: #f4f4f5; font-size: 26px; font-weight: bold;")
+        lbl_titulo.setStyleSheet(tema.estilo_titulo_tela())
 
         self.combo_filtro = QComboBox()
         self.combo_filtro.addItems([
             "Todos", "SureBet", "Tentativa de Duplo", "Coletar Freebet", 
             "Converter Freebet", "Cassino", "Ganho", "Gasto", "Investimento"
         ])
-        self.combo_filtro.setStyleSheet("""
-            QComboBox { background-color: #18181b; color: #f4f4f5; padding: 10px 15px; border: none; border-radius: 8px; min-width: 150px; font-weight: bold; font-size: 14px; }
-            QComboBox::drop-down { border: none; }
-        """)
+        self.combo_filtro.setStyleSheet("QComboBox { min-width: 160px; font-weight: bold; }")
         self.combo_filtro.currentTextChanged.connect(self.atualizar_dados)
 
         topo_layout.addWidget(lbl_titulo)
@@ -66,7 +74,7 @@ class TelaDashboard(QWidget):
         self.card_lucro_mensal = CardMetrica("Resultado Mensal", "R$ 0.00")
         self.card_media_diaria = CardMetrica("Média Diária", "R$ 0.00")
         self.card_proc_hoje = CardMetrica("Movim. Hoje", "0")
-        self.card_freebets = CardMetrica("Freebets (Em Aberto)", "0", "#a855f7") 
+        self.card_freebets = CardMetrica("Freebets (Em Aberto)", "0", tema.COR_FREEBET)
 
         grid_cards.addWidget(self.card_lucro_diario, 0, 0)
         grid_cards.addWidget(self.card_lucro_mensal, 0, 1)
@@ -77,11 +85,11 @@ class TelaDashboard(QWidget):
         layout_principal.addLayout(grid_cards)
 
         self.abas_graficos = QTabWidget()
-        self.abas_graficos.setStyleSheet("""
-            QTabWidget::pane { border: none; background-color: #18181b; border-radius: 16px; }
-            QTabBar::tab { background: transparent; color: #71717a; padding: 10px 20px; border: none; font-weight: bold; font-size: 14px; margin-bottom: 10px; }
-            QTabBar::tab:selected { color: #3b82f6; border-bottom: 2px solid #3b82f6; }
-        """)
+        self.abas_graficos.setStyleSheet(
+            f"QTabWidget::pane {{ border: none; background-color: {tema.SUPERFICIE};"
+            f" border-radius: {tema.RAIO_CARD}px; }}"
+            " QTabBar::tab { margin-bottom: 8px; }"
+        )
 
         self.grafico_linha = self.criar_grafico()
         self.abas_graficos.addTab(self.criar_aba_padrao(self.grafico_linha), "Evolução Mensal")
@@ -96,8 +104,8 @@ class TelaDashboard(QWidget):
         self.chart_view.setRenderHint(QPainter.Antialiasing)
         self.chart_view.setStyleSheet("background: transparent;")
         self.chart_view.chart().setBackgroundBrush(QBrush(Qt.transparent))
-        self.chart_view.chart().setTitleBrush(QBrush(QColor("#f4f4f5")))
-        self.chart_view.chart().legend().setLabelBrush(QBrush(QColor("#f4f4f5")))
+        self.chart_view.chart().setTitleBrush(QBrush(QColor(tema.TEXTO)))
+        self.chart_view.chart().legend().setLabelBrush(QBrush(QColor(tema.TEXTO)))
         lay_pizza.addWidget(self.chart_view)
 
         aba_freebet = QWidget()
@@ -107,10 +115,11 @@ class TelaDashboard(QWidget):
         
         topo_freebet = QHBoxLayout()
         self.lbl_g3 = QLabel("")
-        self.lbl_g3.setStyleSheet("color: #f4f4f5; font-size: 16px; font-weight: bold; border: none;")
+        self.lbl_g3.setStyleSheet(f"color: {tema.TEXTO}; font-size: 16px; font-weight: bold; border: none;")
         self.btn_toggle_freebet = QPushButton("Ver em Dinheiro (R$)")
         self.btn_toggle_freebet.clicked.connect(self.alternar_modo_freebet)
-        self.btn_toggle_freebet.setStyleSheet("QPushButton { background-color: transparent; color: #a1a1aa; font-weight: bold; padding: 4px 12px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.1); } QPushButton:hover { color: #f4f4f5; }")
+        self.btn_toggle_freebet.setCursor(Qt.PointingHandCursor)
+        self.btn_toggle_freebet.setStyleSheet("QPushButton { padding: 6px 14px; font-size: 13px; }")
 
         topo_freebet.addWidget(self.lbl_g3)
         topo_freebet.addStretch()
@@ -125,7 +134,7 @@ class TelaDashboard(QWidget):
         
         self.abas_graficos.addTab(self.aba_pizza, "Distribuição")
 
-        estilo_tooltip = "QLabel { background-color: rgba(24, 24, 27, 240); color: #f4f4f5; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 6px 12px; font-weight: bold; font-size: 13px; }"
+        estilo_tooltip = tema.estilo_tooltip_flutuante()
         self.tt_linha = QLabel(self.grafico_linha); self.tt_linha.setStyleSheet(estilo_tooltip); self.tt_linha.hide()
         self.tt_lucro = QLabel(self.grafico_barra_lucro); self.tt_lucro.setStyleSheet(estilo_tooltip); self.tt_lucro.hide()
         self.tt_freebet = QLabel(self.grafico_barra_freebet); self.tt_freebet.setStyleSheet(estilo_tooltip); self.tt_freebet.hide()
@@ -136,7 +145,7 @@ class TelaDashboard(QWidget):
         self.tt_pizza.setAttribute(Qt.WA_TransparentForMouseEvents, True)
         self.tt_pizza.hide()
 
-        self.hover_dot = pg.ScatterPlotItem(size=12, pen=pg.mkPen('#18181b', width=2), brush=pg.mkBrush('#3b82f6'))
+        self.hover_dot = pg.ScatterPlotItem(size=12, pen=pg.mkPen(tema.SUPERFICIE, width=2), brush=pg.mkBrush(tema.AZUL))
         self.hover_dot.setZValue(12)
         self.grafico_linha.addItem(self.hover_dot)
         self.hover_dot.hide()
@@ -168,8 +177,8 @@ class TelaDashboard(QWidget):
         linha_base = pg.InfiniteLine(pos=0, angle=0, pen=pg.mkPen(color=(255, 255, 255, 30), width=1))
         g.addItem(linha_base)
         g.getPlotItem().getViewBox().setBorder(None)
-        g.getAxis('left').setPen(pg.mkPen(None)); g.getAxis('left').setTextPen('#71717a')
-        g.getAxis('bottom').setPen(pg.mkPen(None)); g.getAxis('bottom').setTextPen('#71717a')
+        g.getAxis('left').setPen(pg.mkPen(None)); g.getAxis('left').setTextPen(tema.TEXTO_TERCIARIO)
+        g.getAxis('bottom').setPen(pg.mkPen(None)); g.getAxis('bottom').setTextPen(tema.TEXTO_TERCIARIO)
         g.setMouseEnabled(x=False, y=False)
         g.setMenuEnabled(False)
         g.hideButtons()
@@ -316,17 +325,15 @@ class TelaDashboard(QWidget):
 
         self.atualizar_grafico_pizza(sum(self.ganhos_detalhes.values()), sum(self.gastos_detalhes.values()), t_invest)
 
-        cor_up = "#34d399"; cor_down = "#f87171"
-        self.card_lucro_diario.lbl_valor.setText(f"R$ {lucro_hoje:.2f}")
-        self.card_lucro_diario.lbl_valor.setStyleSheet(f"color: {cor_up if lucro_hoje >= 0 else cor_down}; font-size: 28px; font-weight: bold; border: none;")
-        self.card_lucro_mensal.lbl_valor.setText(f"R$ {lucro_mensal:.2f}")
-        self.card_lucro_mensal.lbl_valor.setStyleSheet(f"color: {cor_up if lucro_mensal >= 0 else cor_down}; font-size: 28px; font-weight: bold; border: none;")
-        self.card_media_diaria.lbl_valor.setText(f"R$ {(lucro_mensal / dia_atual):.2f}")
-        self.card_proc_hoje.lbl_valor.setText(str(proc_hoje))
-        
-        # Atualiza a String do Card Freebets
-        self.card_freebets.lbl_valor.setText(f"{total_pendente} | R$ {valor_pendente:.2f}")
-        self.card_freebets.lbl_valor.setStyleSheet("color: #a855f7; font-size: 20px; font-weight: bold; border: none;")
+        cor_up = tema.COR_POSITIVO; cor_down = tema.COR_NEGATIVO
+        self.card_lucro_diario.definir_valor(f"R$ {lucro_hoje:.2f}", tema.cor_valor(lucro_hoje))
+        self.card_lucro_mensal.definir_valor(f"R$ {lucro_mensal:.2f}", tema.cor_valor(lucro_mensal))
+        media = lucro_mensal / dia_atual
+        self.card_media_diaria.definir_valor(f"R$ {media:.2f}", tema.cor_valor(media))
+        self.card_proc_hoje.definir_valor(str(proc_hoje))
+        self.card_freebets.definir_valor(
+            f"{total_pendente} | R$ {valor_pendente:.2f}", tema.COR_FREEBET, tamanho=22
+        )
 
         acumulado = 0
         self.dados_linha_y = []
@@ -343,14 +350,14 @@ class TelaDashboard(QWidget):
             g.addItem(pg.InfiniteLine(pos=0, angle=0, pen=pg.mkPen(color=(255, 255, 255, 30), width=1)))
 
         self.grafico_linha.addItem(self.hover_dot)
-        self.grafico_linha.plot(self.dados_dias_linha, self.dados_linha_y, pen=pg.mkPen(color='#3b82f6', width=3), fillLevel=0, fillBrush=QColor(59, 130, 246, 50), antialias=True)
+        self.grafico_linha.plot(self.dados_dias_linha, self.dados_linha_y, pen=pg.mkPen(color=tema.AZUL, width=3), fillLevel=0, fillBrush=QColor(59, 130, 246, 50), antialias=True)
         self.grafico_barra_lucro.addItem(pg.BarGraphItem(x=self.dados_dias, height=self.dados_lucro_y, width=0.35, brushes=[cor_up if l >= 0 else cor_down for l in self.dados_lucro_y]))
 
         if self.mostrar_valor_freebet:
             cores_fb = [cor_up if l >= 0 else cor_down for l in self.dados_freebet_lucro]
             bg_freebet = pg.BarGraphItem(x=self.dados_dias, height=self.dados_freebet_lucro, width=0.35, brushes=cores_fb)
         else:
-            bg_freebet = pg.BarGraphItem(x=self.dados_dias, height=self.dados_freebet_qtd, width=0.35, brush='#a855f7')
+            bg_freebet = pg.BarGraphItem(x=self.dados_dias, height=self.dados_freebet_qtd, width=0.35, brush=tema.COR_FREEBET)
         self.grafico_barra_freebet.addItem(bg_freebet)
 
         for grafico in [self.grafico_linha, self.grafico_barra_lucro, self.grafico_barra_freebet]:
@@ -363,21 +370,21 @@ class TelaDashboard(QWidget):
     def atualizar_grafico_pizza(self, v_ganhos, v_gastos, v_invest):
         chart = QChart()
         chart.setBackgroundBrush(QBrush(Qt.transparent))
-        chart.setTitleBrush(QBrush(QColor("#f4f4f5")))
+        chart.setTitleBrush(QBrush(QColor(tema.TEXTO)))
         series = QPieSeries()
 
         if v_ganhos > 0:
             s_ganhos = series.append("Ganhos", v_ganhos)
-            s_ganhos.setColor(QColor("#34d399"))
-            s_ganhos.setLabelBrush(QColor("#f4f4f5"))
+            s_ganhos.setColor(QColor(tema.COR_POSITIVO))
+            s_ganhos.setLabelBrush(QColor(tema.TEXTO))
         if v_gastos > 0:
             s_gastos = series.append("Gastos", v_gastos)
-            s_gastos.setColor(QColor("#f87171"))
-            s_gastos.setLabelBrush(QColor("#f4f4f5"))
+            s_gastos.setColor(QColor(tema.COR_NEGATIVO))
+            s_gastos.setLabelBrush(QColor(tema.TEXTO))
         if v_invest > 0:
             s_invest = series.append("Investimento", v_invest)
-            s_invest.setColor(QColor("#3b82f6"))
-            s_invest.setLabelBrush(QColor("#f4f4f5"))
+            s_invest.setColor(QColor(tema.AZUL))
+            s_invest.setLabelBrush(QColor(tema.TEXTO))
         
         series.setLabelsVisible(True)
         series.setLabelsPosition(QPieSlice.LabelOutside)
@@ -387,7 +394,7 @@ class TelaDashboard(QWidget):
 
         chart.addSeries(series)
         chart.legend().setAlignment(Qt.AlignBottom)
-        chart.legend().setLabelBrush(QColor("#f4f4f5"))
+        chart.legend().setLabelBrush(QColor(tema.TEXTO))
         self.chart_view.setChart(chart)
 
     def ao_clicar_pizza(self, slice):
