@@ -4,6 +4,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, QSettings
 from core import database
+from core import tema
 
 def carregar_casas_ativas():
     casas_db = database.listar_casas_ativas()
@@ -73,31 +74,20 @@ class TelaCasasApostas(QWidget):
         self.casas_ativas = carregar_casas_ativas()
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(20, 20, 20, 20) 
-        layout.setSpacing(20)
-        
+        layout.setContentsMargins(*tema.MARGEM_TELA)
+        layout.setSpacing(tema.ESPACO_G)
+
         # --- CABEÇALHO ---
         header_lay = QVBoxLayout()
+        header_lay.setSpacing(tema.ESPACO_M)
         titulo = QLabel("Minhas Casas de Apostas")
-        titulo.setStyleSheet("font-size: 26px; font-weight: bold; color: #f4f4f5;")
+        titulo.setStyleSheet(tema.estilo_titulo_tela())
         header_lay.addWidget(titulo)
         
         self.input_add = QLineEdit()
         self.input_add.setPlaceholderText("Digite a casa e aperte Enter (adiciona nova ou fixa existente)...")
-        self.input_add.setFixedHeight(45)
-        self.input_add.setStyleSheet("""
-            QLineEdit {
-                background-color: #18181b;
-                color: white;
-                border: 2px solid rgba(255, 255, 255, 0.1);
-                border-radius: 10px;
-                padding: 0 15px;
-                font-size: 14px;
-            }
-            QLineEdit:focus {
-                border: 2px solid #3b82f6;
-            }
-        """)
+        self.input_add.setFixedHeight(46)
+        self.input_add.setStyleSheet("QLineEdit { padding: 0 16px; }")
         self.input_add.returnPressed.connect(self.adicionar_casa_grade)
         
         header_lay.addWidget(self.input_add)
@@ -106,10 +96,10 @@ class TelaCasasApostas(QWidget):
         # --- ÁREA DE GRADE ---
         self.scroll = QScrollArea()
         self.scroll.setWidgetResizable(True)
-        self.scroll.setStyleSheet("QScrollArea { border: none; background-color: transparent; }")
-        
+
         self.container_grid = QWidget()
-        self.container_grid.setStyleSheet("background-color: transparent;")
+        self.container_grid.setObjectName("gradeBancas")
+        self.container_grid.setStyleSheet("#gradeBancas { background-color: transparent; }")
         self.container_grid.setSizePolicy(self.container_grid.sizePolicy().Policy.Expanding, self.container_grid.sizePolicy().Policy.Fixed)
         
         self.grid_lay = QGridLayout(self.container_grid)
@@ -118,15 +108,33 @@ class TelaCasasApostas(QWidget):
         
         self.scroll.setWidget(self.container_grid)
         layout.addWidget(self.scroll)
+
+        self.lbl_vazio = QLabel(
+            "Nenhuma casa fixada ainda.\n"
+            "Digite o nome de uma casa acima e aperte Enter para fixá-la aqui."
+        )
+        self.lbl_vazio.setAlignment(Qt.AlignCenter)
+        self.lbl_vazio.setStyleSheet(
+            f"color: {tema.TEXTO_TERCIARIO}; font-size: 14px; background: transparent;"
+        )
+        self.lbl_vazio.hide()
+        layout.addWidget(self.lbl_vazio)
         
         # Auto-completar 
         self.lista_casas_db = database.listar_casas()
         self.completer = QCompleter(self.lista_casas_db)
         self.completer.setCaseSensitivity(Qt.CaseInsensitive)
-        self.completer.popup().setStyleSheet("""
-            QListView { background-color: #18181b; color: #f4f4f5; border: 1px solid #3b82f6; border-radius: 5px; font-size: 14px; }
-            QListView::item:selected { background-color: #27272a; }
-        """)
+        self.completer.popup().setStyleSheet(
+            f"""
+            QListView {{
+                background-color: {tema.SUPERFICIE}; color: {tema.TEXTO};
+                border: 1px solid {tema.BORDA}; border-radius: {tema.RAIO_M}px;
+                font-size: 14px; padding: 4px; outline: none;
+            }}
+            QListView::item {{ padding: 6px 8px; border-radius: {tema.RAIO_P}px; }}
+            QListView::item:selected {{ background-color: {tema.SUPERFICIE_ALTA}; }}
+            """
+        )
         self.input_add.setCompleter(self.completer)
         
         self.renderizar_grid()
@@ -182,36 +190,46 @@ class TelaCasasApostas(QWidget):
             
         for i, nome in enumerate(self.casas_ativas):
             card = QFrame()
-            card.setFixedHeight(80) 
-            card.setStyleSheet("""
-                QFrame {
-                    background-color: #18181b;
-                    border: 1px solid rgba(255, 255, 255, 0.05);
-                    border-radius: 12px;
-                }
-                QFrame:hover { border: 1px solid #3b82f6; }
-            """)
+            card.setFixedHeight(80)
+            card.setStyleSheet(
+                f"""
+                QFrame {{
+                    background-color: {tema.SUPERFICIE};
+                    border: 1px solid {tema.BORDA};
+                    border-radius: {tema.RAIO_G}px;
+                }}
+                QFrame:hover {{ border: 1px solid {tema.AZUL}; }}
+                """
+            )
             
             card_grid = QGridLayout(card)
             card_grid.setContentsMargins(10, 5, 10, 5)
             
             lbl_nome = QLabel(nome)
             lbl_nome.setAlignment(Qt.AlignCenter)
-            lbl_nome.setStyleSheet("font-size: 20px; font-weight: bold; color: #f4f4f5; border: none; background: transparent;")
+            lbl_nome.setStyleSheet(
+                f"font-size: 19px; font-weight: bold; color: {tema.TEXTO}; border: none; background: transparent;"
+            )
             
             btn_remover = QPushButton("✕")
             btn_remover.setFixedSize(24, 24)
             btn_remover.setCursor(Qt.PointingHandCursor)
-            btn_remover.setStyleSheet("""
-                QPushButton { background-color: transparent; color: #52525b; border: none; }
-                QPushButton:hover { color: #ef4444; background-color: rgba(239, 68, 68, 0.1); border-radius: 12px; }
-            """)
+            btn_remover.setToolTip("Remover da lista de bancas fixadas")
+            btn_remover.setStyleSheet(
+                f"""
+                QPushButton {{ background-color: transparent; color: #52525b; border: none; padding: 0; font-size: 13px; }}
+                QPushButton:hover {{ color: {tema.VERMELHO_HOVER}; background-color: rgba(239, 68, 68, 0.12); border-radius: 12px; }}
+                """
+            )
             btn_remover.clicked.connect(lambda checked=False, n=nome: self.remover_casa(n))
             
             card_grid.addWidget(lbl_nome, 0, 0, 1, 1)
             card_grid.addWidget(btn_remover, 0, 0, Qt.AlignTop | Qt.AlignRight)
 
             self.grid_lay.addWidget(card, i // 4, i % 4)
+
+        if hasattr(self, "lbl_vazio"):
+            self.lbl_vazio.setVisible(not self.casas_ativas)
 
     def atualizar_dados(self):
         self.casas_ativas = carregar_casas_ativas()

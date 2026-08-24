@@ -8,6 +8,34 @@ from telas.procedimentos import DialogNovoProcedimento
 from telas.casas_apostas import adicionar_casas_a_bancas, montar_mensagem_casas_adicionadas
 from telas.notificacoes import mostrar_notificacao
 from core import database
+from core import tema
+
+COR_LAY = "#ec4899"
+
+ESTILO_MINI = (
+    f"QPushButton {{ background-color: transparent; color: {tema.TEXTO_SECUNDARIO};"
+    f" font-size: 13px; border: 1px solid {tema.BORDA_FORTE}; border-radius: {tema.RAIO_P}px;"
+    " font-weight: bold; padding: 0; }"
+    f"QPushButton:hover {{ background-color: rgba(255,255,255,0.05); color: {tema.TEXTO}; }}"
+)
+
+ESTILO_MINI_ATIVO = (
+    f"QPushButton {{ background-color: rgba(59, 130, 246, 0.16); color: {tema.AZUL};"
+    f" font-size: 13px; border: 1px solid {tema.AZUL}; border-radius: {tema.RAIO_P}px;"
+    " font-weight: bold; padding: 0; }"
+)
+
+ESTILO_MINI_BACK = (
+    f"QPushButton {{ background-color: {tema.AZUL}; color: white; border: none;"
+    f" border-radius: {tema.RAIO_P}px; font-weight: bold; font-size: 16px; padding: 0; }}"
+    f"QPushButton:hover {{ background-color: {tema.AZUL_HOVER}; }}"
+)
+
+ESTILO_MINI_LAY = (
+    f"QPushButton {{ background-color: {COR_LAY}; color: white; border: none;"
+    f" border-radius: {tema.RAIO_P}px; font-weight: bold; font-size: 16px; padding: 0; }}"
+    " QPushButton:hover { background-color: #db2777; }"
+)
 
 class TelaCalculadora(QWidget):
     sinal_conversao_freebet_salva = Signal(object)
@@ -28,49 +56,25 @@ class TelaCalculadora(QWidget):
 
         self.scroll = QScrollArea()
         self.scroll.setWidgetResizable(True)
-        self.scroll.setStyleSheet("border: none; background-color: #09090b;")
+        self.scroll.setStyleSheet(f"QScrollArea {{ border: none; background-color: {tema.FUNDO}; }}")
         
         self.container = QWidget()
-        self.container.setStyleSheet("background-color: #09090b;")
+        self.container.setObjectName("containerCalculadora")
+        self.container.setStyleSheet(
+            f"#containerCalculadora {{ background-color: {tema.FUNDO}; }}"
+        )
       
         self.layout_container = QVBoxLayout(self.container)
         self.layout_container.setContentsMargins(40, 30, 40, 40)
         self.layout_container.setSpacing(30)
         
         titulo = QLabel("Calculadoras")
-        titulo.setStyleSheet("font-size: 24px; font-weight: bold; color: #f4f4f5;")
+        titulo.setStyleSheet(tema.estilo_titulo_tela())
         self.layout_container.addWidget(titulo)
 
-        self.estilo_geral = """
-            QGroupBox { 
-                border: 1px solid rgba(255,255,255,0.05);
-                border-radius: 12px; 
-                margin-top: 20px; 
-                padding-top: 30px; 
-                color: #f4f4f5; 
-                font-weight: bold; 
-                font-size: 16px;
-            }
-            QLabel { color: #a1a1aa; font-weight: normal; font-size: 13px; }
-            QLineEdit, QComboBox { 
-                background-color: #18181b;
-                color: white; 
-                border: 1px solid rgba(255,255,255,0.1); 
-                padding: 10px; 
-                border-radius: 6px; 
-                outline: none; 
-                font-size: 14px;
-            }
-            QLineEdit:focus, QComboBox:focus { border: 1px solid #3b82f6; }
-            QPushButton { 
-                background-color: #27272a;
-                color: white; 
-                border-radius: 6px; 
-                padding: 8px; 
-                font-weight: bold; 
-                border: none;
-            }
-            QPushButton:hover { background-color: #3f3f46; }
+        self.estilo_geral = f"""
+            QGroupBox {{ margin-top: 18px; padding-top: 28px; }}
+            QLabel {{ color: {tema.TEXTO_SECUNDARIO}; font-weight: normal; font-size: 13px; }}
         """
 
         self.linhas_sure = []
@@ -130,14 +134,18 @@ class TelaCalculadora(QWidget):
         lay_sure.addWidget(self.container_linhas_sure)
 
         self.frame_res = QFrame()
-        self.frame_res.setStyleSheet("background-color: #18181b; border-radius: 8px; padding: 15px;")
+        self.frame_res.setStyleSheet(
+            f"background-color: {tema.SUPERFICIE}; border-radius: {tema.RAIO_M}px; padding: 15px;"
+        )
         lay_res = QHBoxLayout(self.frame_res)
         
         self.lbl_investimento = QLabel("Custo Efetivo: R$ 0.00")
         self.lbl_retorno = QLabel("Retorno: R$ 0.00")
         
         self.lbl_lucro_sure = QLabel("Lucro: R$ 0.00 (0%)")
-        self.lbl_lucro_sure.setStyleSheet("color: #34d399; font-weight: bold; font-size: 15px;")
+        self.lbl_lucro_sure.setStyleSheet(
+            f"color: {tema.COR_POSITIVO}; font-weight: bold; font-size: 15px;"
+        )
         
         lay_res.addWidget(self.lbl_investimento)
         lay_res.addWidget(self.lbl_retorno)
@@ -146,15 +154,19 @@ class TelaCalculadora(QWidget):
 
         lay_acoes = QHBoxLayout()
         self.check_duplo = QCheckBox("Possibilidade de Duplo Green")
-        self.check_duplo.setStyleSheet("color: #a1a1aa; font-weight: bold; font-size: 13px;")
+        self.check_duplo.setStyleSheet(
+            f"QCheckBox {{ color: {tema.TEXTO_SECUNDARIO}; font-weight: bold; font-size: 13px; }}"
+        )
         
         self.btn_limpar = QPushButton("Limpar")
   
-        self.btn_limpar.setStyleSheet("background-color: transparent; color: #f87171; font-weight: bold; padding: 10px 20px; border: 1px solid #f87171; border-radius: 8px;")
+        self.btn_limpar.setProperty("variante", "perigo")
+        self.btn_limpar.setCursor(Qt.PointingHandCursor)
         self.btn_limpar.clicked.connect(self.limpar_calculadora)
         
         self.btn_criar_proc = QPushButton("Criar Procedimento")
-        self.btn_criar_proc.setStyleSheet("background-color: #3b82f6; color: white; font-weight: bold; padding: 10px 20px; border-radius: 8px;")
+        self.btn_criar_proc.setProperty("variante", "acento")
+        self.btn_criar_proc.setCursor(Qt.PointingHandCursor)
         self.btn_criar_proc.clicked.connect(self.abrir_modal_procedimento)
         
         lay_acoes.addWidget(self.check_duplo)
@@ -177,9 +189,9 @@ class TelaCalculadora(QWidget):
         
         l["btn_adv"].setText(f"{sinal}" if tem_algo else sinal)
         if tem_algo:
-            l["btn_adv"].setStyleSheet("background-color: rgba(59, 130, 246, 0.1); color: #3b82f6; font-size: 12px; border: 1px solid #3b82f6; border-radius: 6px; font-weight: bold;")
+            l["btn_adv"].setStyleSheet(ESTILO_MINI_ATIVO)
         else:
-            l["btn_adv"].setStyleSheet("background-color: transparent; color: #a1a1aa; font-size: 12px; border: 1px solid rgba(255,255,255,0.1); border-radius: 6px;")
+            l["btn_adv"].setStyleSheet(ESTILO_MINI)
 
     def atualizar_indicador_fixar(self, idx):
         if idx >= len(self.linhas_sure):
@@ -191,9 +203,9 @@ class TelaCalculadora(QWidget):
         btn.setToolTip("Stake fixa atual" if fixada else "Fixar stake")
 
         if fixada:
-            btn.setStyleSheet("background-color: rgba(59, 130, 246, 0.18); color: #3b82f6; font-size: 13px; border: 1px solid #3b82f6; border-radius: 6px; font-weight: bold;")
+            btn.setStyleSheet(ESTILO_MINI_ATIVO)
         else:
-            btn.setStyleSheet("background-color: transparent; color: #a1a1aa; font-size: 13px; border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; font-weight: bold;")
+            btn.setStyleSheet(ESTILO_MINI)
 
     def atualizar_botoes_fixar(self):
         for idx in range(len(self.linhas_sure)):
@@ -276,7 +288,10 @@ class TelaCalculadora(QWidget):
             
             inp_stake = QLineEdit()
             inp_resp = QLineEdit(); inp_resp.setPlaceholderText("Responsabilidade")
-            inp_resp.setStyleSheet("color: #ec4899; font-weight: bold; background-color: rgba(236, 72, 153, 0.05); border: 1px solid rgba(236, 72, 153, 0.2);")
+            inp_resp.setStyleSheet(
+                f"QLineEdit {{ color: {COR_LAY}; font-weight: bold;"
+                " background-color: rgba(236, 72, 153, 0.05); border: 1px solid rgba(236, 72, 153, 0.2); }"
+            )
             inp_resp.hide()
 
             btn_fixar = QPushButton("F")
@@ -300,17 +315,20 @@ class TelaCalculadora(QWidget):
 
             btn_tipo = QPushButton("B")
             btn_tipo.setFixedSize(40, 40)
-            btn_tipo.setStyleSheet("background-color: #3b82f6; color: white; border-radius: 6px; font-weight: bold; font-size: 16px;")
+            btn_tipo.setStyleSheet(ESTILO_MINI_BACK)
             btn_tipo.setCursor(Qt.PointingHandCursor)
             
             btn_adv = QPushButton("v")
             btn_adv.setFixedSize(35, 40)
-            btn_adv.setStyleSheet("background-color: transparent; color: #a1a1aa; font-size: 12px; border: 1px solid rgba(255,255,255,0.1); border-radius: 6px;")
+            btn_adv.setStyleSheet(ESTILO_MINI)
             btn_adv.setCursor(Qt.PointingHandCursor)
 
             lbl_lucro = QLabel("R$ 0.00")
             lbl_lucro.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
-            lbl_lucro.setStyleSheet("color: #a1a1aa; font-weight: bold; background-color: #18181b; border-radius: 6px; padding: 8px 15px; font-size: 15px;")
+            lbl_lucro.setStyleSheet(
+                f"color: {tema.TEXTO_SECUNDARIO}; font-weight: bold; background-color: {tema.SUPERFICIE};"
+                f" border-radius: {tema.RAIO_P}px; padding: 8px 15px; font-size: 15px;"
+            )
             
             m_lay.addWidget(inp_odd, 2)
  
@@ -323,13 +341,16 @@ class TelaCalculadora(QWidget):
             a_lay = QHBoxLayout(adv_row)
             a_lay.setContentsMargins(10, 10, 10, 10)
       
-            adv_row.setStyleSheet("background-color: #18181b; border-radius: 6px;")
+            adv_row.setObjectName("linhaAvancada")
+            adv_row.setStyleSheet(
+                f"#linhaAvancada {{ background-color: {tema.SUPERFICIE}; border-radius: {tema.RAIO_P}px; }}"
+            )
             
             lbl_aum = QLabel("Aumento %:"); inp_aum = QLineEdit(); inp_aum.setFixedWidth(60)
             lbl_com = QLabel("Comissão %:"); inp_com = QLineEdit(); inp_com.setFixedWidth(60)
             lbl_cash = QLabel("Cashback %:"); inp_cash = QLineEdit(); inp_cash.setFixedWidth(60)
             chk_fb = QCheckBox("Freebet (Só Lucro)")
-            chk_fb.setStyleSheet("color: #f4f4f5; font-weight: bold; margin-left: 10px;")
+            chk_fb.setStyleSheet(f"QCheckBox {{ color: {tema.TEXTO}; font-weight: bold; margin-left: 10px; }}")
 
             a_lay.addStretch()
             a_lay.addWidget(lbl_aum); a_lay.addWidget(inp_aum); a_lay.addSpacing(15)
@@ -358,11 +379,11 @@ class TelaCalculadora(QWidget):
                 resp = self.linhas_sure[idx]["inp_resp"]
                 if b.text() == "B":
                     b.setText("L")
-                    b.setStyleSheet("background-color: #ec4899; color: white; border-radius: 6px; font-weight: bold; font-size: 16px;")
+                    b.setStyleSheet(ESTILO_MINI_LAY)
                     resp.show()
                 else:
                     b.setText("B")
-                    b.setStyleSheet("background-color: #3b82f6; color: white; border-radius: 6px; font-weight: bold; font-size: 16px;")
+                    b.setStyleSheet(ESTILO_MINI_BACK)
                     resp.hide()
                 self.sincronizar_campos(idx, "odd")
                 self.calcular_surebet()
@@ -386,7 +407,7 @@ class TelaCalculadora(QWidget):
                 self.linhas_sure[i]["stake_manual"] = e.get("stake_manual", False)
                 if e["tipo"] == "L":
          
-                    btn_tipo.setText("L"); btn_tipo.setStyleSheet("background-color: #ec4899; color: white; border-radius: 6px; font-weight: bold; font-size: 16px;")
+                    btn_tipo.setText("L"); btn_tipo.setStyleSheet(ESTILO_MINI_LAY)
                     inp_resp.show()
                 if e["adv_vis"]: adv_row.show()
 
@@ -429,7 +450,7 @@ class TelaCalculadora(QWidget):
             if l["btn_tipo"].text() == "L":
                 l["btn_tipo"].setText("B")
  
-                l["btn_tipo"].setStyleSheet("background-color: #3b82f6; color: white; border-radius: 6px; font-weight: bold; font-size: 16px;")
+                l["btn_tipo"].setStyleSheet(ESTILO_MINI_BACK)
                 l["inp_resp"].hide()
             self.atualizar_indicador_adv(idx)
             self.atualizar_indicador_fixar(idx)
@@ -450,7 +471,9 @@ class TelaCalculadora(QWidget):
         self.lbl_investimento.setText("Custo Efetivo: R$ 0.00")
         self.lbl_retorno.setText("Retorno: R$ 0.00")
         self.lbl_lucro_sure.setText("Lucro: R$ 0.00 (0%)")
-        self.lbl_lucro_sure.setStyleSheet("color: #34d399; font-weight: bold; font-size: 15px;")
+        self.lbl_lucro_sure.setStyleSheet(
+            f"color: {tema.COR_POSITIVO}; font-weight: bold; font-size: 15px;"
+        )
         
         self.lucro_global_atual = 0.0
         self.media_retornos_atual = 0.0
@@ -629,7 +652,10 @@ class TelaCalculadora(QWidget):
                 lf = lucros_finais[i]
                 l["lucro_lbl"].setText(f"R$ {lf:.2f}")
                 cor = "#34d399" if lf > 0 else ("#f87171" if lf < 0 else "#a1a1aa")
-                l["lucro_lbl"].setStyleSheet(f"color: {cor}; font-weight: bold; background-color: #18181b; border-radius: 6px; padding: 8px 15px; font-size: 15px;")
+                l["lucro_lbl"].setStyleSheet(
+                    f"color: {cor}; font-weight: bold; background-color: {tema.SUPERFICIE};"
+                    f" border-radius: {tema.RAIO_P}px; padding: 8px 15px; font-size: 15px;"
+                )
                 
            # Filtra apenas as linhas que foram realmente preenchidas com odds e investimentos (M > 0)
             lucros_finais_validos = [lf for i, lf in enumerate(lucros_finais) if self.linhas_sure[i]["math"]["M"] > 0]
@@ -654,7 +680,9 @@ class TelaCalculadora(QWidget):
             self.lbl_retorno.setText(f"Retorno Ref: R$ {ret_padrao:.2f}")
             porc = (lg / investimento_liquido * 100) if investimento_liquido > 0 else 0
             self.lbl_lucro_sure.setText(f"Lucro Líquido: R$ {lg:.2f} ({porc:.1f}%)")
-            self.lbl_lucro_sure.setStyleSheet(f"color: {'#34d399' if lg >= 0 else '#f87171'}; font-weight: bold; font-size: 15px;")
+            self.lbl_lucro_sure.setStyleSheet(
+                f"color: {tema.cor_valor(lg)}; font-weight: bold; font-size: 15px;"
+            )
             
             self.lucro_global_atual = lg
 
@@ -731,7 +759,9 @@ class TelaCalculadora(QWidget):
       
         lay_media.addWidget(btn_add)
         self.lbl_res_media = QLabel("Odd Média: 0.00")
-        self.lbl_res_media.setStyleSheet("color: #3b82f6; font-size: 18px; font-weight: bold; margin-top: 15px;")
+        self.lbl_res_media.setStyleSheet(
+            f"color: {tema.AZUL}; font-size: 18px; font-weight: bold; margin-top: 15px;"
+        )
         lay_media.addWidget(self.lbl_res_media)
         self.linhas_media = []
         self.add_linha_media(); self.add_linha_media()

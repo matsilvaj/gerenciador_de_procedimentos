@@ -1,13 +1,15 @@
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QDialog, QGroupBox, QCheckBox,
                                QComboBox, QTableWidget, QTableWidgetItem, QHeaderView, QFrame, QToolTip)
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QEvent, QMargins
 from PySide6.QtGui import QColor, QBrush, QPainter, QCursor
 from PySide6.QtCharts import QChart, QChartView, QPieSeries, QPieSlice
 from core import database
+from core import tema
+from telas.componentes import AvisoTabelaVazia
 from telas.procedimentos import TabelaProcedimentos, DialogEscolherCasas, TIPOS_MOVIMENTACAO, COR_AZUL_DESTAQUE
 
-COR_VERDE = "#34d399"
-COR_VERMELHO = "#f87171"
+COR_VERDE = tema.COR_POSITIVO
+COR_VERMELHO = tema.COR_NEGATIVO
 
 class DialogFiltrosHistorico(QDialog):
     def __init__(self, parent=None, filtros_atuais=None):
@@ -17,13 +19,7 @@ class DialogFiltrosHistorico(QDialog):
         self.setModal(True)
         self.filtros_atuais = filtros_atuais if filtros_atuais else {"tipos": [], "casas": []}
         
-        self.setStyleSheet("""
-            QDialog { background-color: #09090b; }
-            QGroupBox { border: none; margin-top: 15px; padding-top: 15px; color: #f4f4f5; font-weight: bold;}
-            QLabel { color: #a1a1aa; font-weight: bold; }
-            QCheckBox { color: #f4f4f5; font-size: 14px; padding: 5px; }
-            QPushButton { background-color: #27272a; color: white; border-radius: 8px; padding: 10px; font-weight: bold; border: none; }
-        """)
+        self.setStyleSheet("QCheckBox { padding: 4px; }")
 
         layout = QVBoxLayout(self)
 
@@ -54,11 +50,11 @@ class DialogFiltrosHistorico(QDialog):
 
         botoes = QHBoxLayout()
         btn_limpar = QPushButton("Limpar")
-        btn_limpar.setStyleSheet("background-color: transparent; color: #71717a;")
+        btn_limpar.setProperty("variante", "fantasma")
         btn_limpar.clicked.connect(self.limpar)
         
         btn_aplicar = QPushButton("APLICAR")
-        btn_aplicar.setStyleSheet(f"background-color: {COR_AZUL_DESTAQUE}; color: white;")
+        btn_aplicar.setProperty("variante", "acento")
         btn_aplicar.clicked.connect(self.aplicar)
         
         botoes.addWidget(btn_limpar); botoes.addWidget(btn_aplicar)
@@ -72,11 +68,11 @@ class DialogFiltrosHistorico(QDialog):
             if sel:
                 self.lbl_casas.setText(" | ".join(sel)); self.lbl_casas.setStyleSheet(f"color: {COR_AZUL_DESTAQUE};")
             else:
-                self.lbl_casas.setText("Nenhuma selecionada"); self.lbl_casas.setStyleSheet("color: #a1a1aa;")
+                self.lbl_casas.setText("Nenhuma selecionada"); self.lbl_casas.setStyleSheet(f"color: {tema.TEXTO_SECUNDARIO};")
 
     def limpar(self):
         for chk in self.checks_tipos.values(): chk.setChecked(False)
-        self.lbl_casas.setText("Nenhuma selecionada"); self.lbl_casas.setStyleSheet("color: #a1a1aa;")
+        self.lbl_casas.setText("Nenhuma selecionada"); self.lbl_casas.setStyleSheet(f"color: {tema.TEXTO_SECUNDARIO};")
 
     def aplicar(self):
         self.filtros_atuais["tipos"] = [t for t, chk in self.checks_tipos.items() if chk.isChecked()]
@@ -89,20 +85,20 @@ class TelaHistorico(QWidget):
         super().__init__()
         self.filtros_avancados = {"tipos": [], "casas": []}
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(40, 30, 40, 40)
+        layout.setContentsMargins(*tema.MARGEM_TELA)
         layout.setSpacing(25)
 
         topo_layout = QHBoxLayout()
         lbl_titulo = QLabel("Arquivo Histórico")
-        lbl_titulo.setStyleSheet("color: #f4f4f5; font-size: 22px; font-weight: bold;")
+        lbl_titulo.setStyleSheet(tema.estilo_titulo_tela())
         
         self.combo_meses = QComboBox()
         self.combo_meses.setMinimumWidth(150)
-        self.combo_meses.setStyleSheet("background-color: #18181b; color: #f4f4f5; padding: 10px; border: none; border-radius: 8px; outline: none;")
+        self.combo_meses.setStyleSheet("QComboBox { min-width: 150px; font-weight: bold; }")
         self.combo_meses.currentTextChanged.connect(lambda: self.carregar_dados_historicos())
 
         self.btn_filtros = QPushButton("Filtros")
-        self.btn_filtros.setStyleSheet("background-color: #27272a; color: white; font-weight: bold; padding: 10px 20px; border-radius: 8px; border: none;")
+        self.btn_filtros.setCursor(Qt.PointingHandCursor)
         self.btn_filtros.clicked.connect(self.abrir_filtros)
 
         topo_layout.addWidget(lbl_titulo)
@@ -114,13 +110,16 @@ class TelaHistorico(QWidget):
         resumo_layout = QHBoxLayout()
 
         self.card_resumo = QFrame()
-        self.card_resumo.setStyleSheet("background-color: #18181b; border-radius: 16px; border: none;")
+        self.card_resumo.setStyleSheet(tema.estilo_card())
         self.card_resumo.setFixedHeight(120)
         layout_card = QVBoxLayout(self.card_resumo)
         layout_card.setContentsMargins(20,20,20,20)
         
         lbl_desc = QLabel("RESULTADO NO PERÍODO")
-        lbl_desc.setStyleSheet("color: #71717a; font-size: 13px; font-weight: bold;")
+        lbl_desc.setStyleSheet(
+            f"color: {tema.TEXTO_TERCIARIO}; font-size: 12px; font-weight: bold;"
+            " text-transform: uppercase; letter-spacing: 0.5px; background: transparent;"
+        )
         lbl_desc.setAlignment(Qt.AlignCenter)
         
         self.lbl_lucro_total = QLabel("R$ 0.00")
@@ -129,7 +128,7 @@ class TelaHistorico(QWidget):
         layout_card.addWidget(self.lbl_lucro_total)
 
         self.card_pizza = QFrame()
-        self.card_pizza.setStyleSheet("background-color: #18181b; border-radius: 16px; border: none;")
+        self.card_pizza.setStyleSheet(tema.estilo_card())
         self.card_pizza.setFixedHeight(150)
         lay_pizza = QVBoxLayout(self.card_pizza)
         lay_pizza.setContentsMargins(0,0,0,0)
@@ -138,6 +137,13 @@ class TelaHistorico(QWidget):
         self.chart_view.setRenderHint(QPainter.Antialiasing)
         self.chart_view.setStyleSheet("background: transparent;")
         lay_pizza.addWidget(self.chart_view)
+
+        self.tt_pizza = QLabel(self.chart_view)
+        self.tt_pizza.setStyleSheet(tema.estilo_tooltip_flutuante())
+        self.tt_pizza.setTextFormat(Qt.RichText)
+        self.tt_pizza.setAttribute(Qt.WA_TransparentForMouseEvents, True)
+        self.tt_pizza.hide()
+        self.chart_view.viewport().installEventFilter(self)
 
         resumo_layout.addWidget(self.card_resumo)
         resumo_layout.addWidget(self.card_pizza)
@@ -153,13 +159,15 @@ class TelaHistorico(QWidget):
         self.tabela.setSelectionMode(QTableWidget.NoSelection)
         self.tabela.setFocusPolicy(Qt.NoFocus)
         self.tabela.setShowGrid(False)
-        self.tabela.setStyleSheet("""
-            QTableWidget { background-color: transparent; color: #f4f4f5; border: none; gridline-color: transparent; font-size: 14px; outline: none; }
-            QTableWidget::item { border: none; border-bottom: 1px solid rgba(255,255,255,0.03); padding: 5px; }
-            QTableWidget::item:selected { background-color: transparent; color: #f4f4f5; }
-            QHeaderView::section { background-color: transparent; color: #71717a; font-weight: bold; border: none; border-bottom: 1px solid rgba(255,255,255,0.05); padding: 12px 8px; }
-        """)
+        self.tabela.setStyleSheet(
+            "QTableWidget::item:selected { background-color: transparent; color: %s; }" % tema.TEXTO
+        )
         layout.addWidget(self.tabela)
+        self.aviso_vazio = AvisoTabelaVazia(
+            self.tabela,
+            "Nenhuma movimentação neste período",
+            "Escolha outro mês no seletor acima ou limpe os filtros aplicados.",
+        )
 
     def abrir_filtros(self):
         d = DialogFiltrosHistorico(self, self.filtros_avancados)
@@ -237,31 +245,37 @@ class TelaHistorico(QWidget):
             self.tabela.setItem(row, 4, item(f"{moeda} {lucro_base:.2f}"))
 
             c_valor = COR_VERDE if l_final >= 0 else COR_VERMELHO
-            if tipo == "Investimento": c_valor = "#3b82f6" 
+            if tipo == "Investimento": c_valor = tema.AZUL
             self.tabela.setItem(row, 5, item(f"{moeda} {l_final:.2f}", c_valor))
+
+        self.aviso_vazio.atualizar()
 
         cor_total = COR_VERDE if lucro_acumulado >= 0 else COR_VERMELHO
         self.lbl_lucro_total.setText(f"R$ {lucro_acumulado:.2f}")
-        self.lbl_lucro_total.setStyleSheet(f"color: {cor_total}; font-size: 32px; font-weight: bold;")
+        self.lbl_lucro_total.setStyleSheet(
+            f"color: {cor_total}; font-size: 30px; font-weight: bold; background: transparent;"
+        )
 
         chart = QChart()
         chart.setBackgroundBrush(QBrush(Qt.transparent))
+        chart.setMargins(QMargins(0, 0, 0, 0))
         chart.legend().hide()
         series = QPieSeries()
 
         if v_ganhos > 0:
             s_ganhos = series.append("Ganhos", v_ganhos)
-            s_ganhos.setColor(QColor("#34d399"))
-            s_ganhos.setLabelBrush(QColor("#f4f4f5"))
+            s_ganhos.setColor(QColor(tema.COR_POSITIVO))
+            s_ganhos.setLabelBrush(QColor(tema.TEXTO))
         if v_gastos > 0:
             s_gastos = series.append("Gastos", v_gastos)
-            s_gastos.setColor(QColor("#f87171"))
-            s_gastos.setLabelBrush(QColor("#f4f4f5"))
+            s_gastos.setColor(QColor(tema.COR_NEGATIVO))
+            s_gastos.setLabelBrush(QColor(tema.TEXTO))
         if v_invest > 0:
             s_invest = series.append("Investimento", v_invest)
-            s_invest.setColor(QColor("#3b82f6"))
-            s_invest.setLabelBrush(QColor("#f4f4f5"))
+            s_invest.setColor(QColor(tema.AZUL))
+            s_invest.setLabelBrush(QColor(tema.TEXTO))
         
+        series.setPieSize(0.8)
         series.setLabelsVisible(True)
         series.setLabelsPosition(QPieSlice.LabelOutside)
         
@@ -269,6 +283,25 @@ class TelaHistorico(QWidget):
 
         chart.addSeries(series)
         self.chart_view.setChart(chart)
+
+    def eventFilter(self, observado, evento):
+        if evento.type() == QEvent.Leave:
+            self.tt_pizza.hide()
+        return super().eventFilter(observado, evento)
+
+    def mostrar_tooltip_pizza(self, texto):
+        self.tt_pizza.setText(texto)
+        self.tt_pizza.adjustSize()
+        pos = self.chart_view.mapFromGlobal(QCursor.pos())
+        px = pos.x() + 15
+        py = pos.y() + 15
+        if px > self.chart_view.width() - self.tt_pizza.width() - 5:
+            px = pos.x() - self.tt_pizza.width() - 15
+        if py > self.chart_view.height() - self.tt_pizza.height() - 5:
+            py = pos.y() - self.tt_pizza.height() - 15
+        self.tt_pizza.move(max(px, 5), max(py, 5))
+        self.tt_pizza.show()
+        self.tt_pizza.raise_()
 
     def ao_passar_mouse_pizza(self, slice, hovered):
         slice.setExploded(hovered)
@@ -281,7 +314,6 @@ class TelaHistorico(QWidget):
             elif slice.label() == "Gastos":
                 for k, v in self.gastos_detalhes.items(): texto += f"<br>• {k}: R$ {v:.2f}"
 
-            self.chart_view.setStyleSheet("QToolTip { background-color: #18181b; color: #f4f4f5; border: 1px solid #3b82f6; border-radius: 8px; padding: 10px; font-size: 13px; }")
-            QToolTip.showText(QCursor.pos(), texto, self.chart_view)
+            self.mostrar_tooltip_pizza(texto)
         else:
-            QToolTip.hideText()
+            self.tt_pizza.hide()

@@ -109,7 +109,8 @@ class TelaDashboard(QWidget):
         lay_pizza.addWidget(self.chart_view)
 
         aba_freebet = QWidget()
-        aba_freebet.setStyleSheet("background: transparent;") 
+        aba_freebet.setObjectName("abaGrafico")
+        aba_freebet.setStyleSheet("#abaGrafico { background: transparent; }")
         layout_freebet = QVBoxLayout(aba_freebet)
         layout_freebet.setContentsMargins(20, 20, 20, 20)
         
@@ -164,7 +165,8 @@ class TelaDashboard(QWidget):
 
     def criar_aba_padrao(self, grafico):
         aba = QWidget()
-        aba.setStyleSheet("background: transparent;")
+        aba.setObjectName("abaGrafico")
+        aba.setStyleSheet("#abaGrafico { background: transparent; }")
         lay = QVBoxLayout(aba)
         lay.setContentsMargins(20, 20, 20, 20)
         lay.addWidget(grafico)

@@ -10,7 +10,9 @@ from PySide6.QtCore import Qt, QEvent, QDate, Signal
 from PySide6.QtGui import QColor, QBrush, QPainter
 from datetime import datetime
 from core import database
+from core import tema
 from telas.casas_apostas import adicionar_casas_a_bancas, montar_mensagem_casas_adicionadas
+from telas.componentes import AvisoTabelaVazia
 from telas.notificacoes import mostrar_notificacao
 import locale
 
@@ -19,9 +21,9 @@ try:
 except:
     locale.setlocale(locale.LC_TIME, '')
 
-COR_VERDE = "#34d399"
-COR_VERMELHO = "#f87171"
-COR_AZUL_DESTAQUE = "#3b82f6"
+COR_VERDE = tema.COR_POSITIVO
+COR_VERMELHO = tema.COR_NEGATIVO
+COR_AZUL_DESTAQUE = tema.COR_DESTAQUE
 TIPOS_MOVIMENTACAO = ["SureBet", "Tentativa de Duplo", "Coletar Freebet", "Converter Freebet", "Cassino", "Ganho", "Gasto", "Investimento"]
 TIPOS_SIMPLES = ["Ganho", "Gasto", "Investimento"]
 
@@ -50,12 +52,7 @@ class DialogEscolherCasas(QDialog):
         self.casas_selecionadas = casas_selecionadas if casas_selecionadas else []
         self.modo_exclusao = False 
         
-        self.setStyleSheet(f"""
-            QDialog {{ background-color: #09090b; }}
-            QCheckBox {{ color: #f4f4f5; font-size: 14px; padding: 5px; }}
-            QPushButton {{ background-color: #27272a; color: white; border-radius: 8px; padding: 8px; font-weight: bold; border: none; }}
-            QLineEdit {{ background-color: #18181b; color: white; padding: 10px; border: none; border-radius: 8px; outline: none; }}
-        """)
+        self.setStyleSheet("QCheckBox { padding: 4px; }")
 
         layout = QVBoxLayout(self)
         topo_layout = QHBoxLayout()
@@ -65,7 +62,7 @@ class DialogEscolherCasas(QDialog):
         self.input_busca.returnPressed.connect(self.adicionar_nova_casa)
         
         self.btn_modo_exclusao = QPushButton("Excluir")
-        self.btn_modo_exclusao.setStyleSheet("background-color: transparent; color: #71717a;")
+        self.btn_modo_exclusao.setProperty("variante", "fantasma")
         self.btn_modo_exclusao.setAutoDefault(False)
         self.btn_modo_exclusao.clicked.connect(self.alternar_modo_exclusao)
         
@@ -75,7 +72,10 @@ class DialogEscolherCasas(QDialog):
 
         self.scroll = QScrollArea()
         self.scroll.setWidgetResizable(True)
-        self.scroll.setStyleSheet("border: none; background-color: #18181b; border-radius: 12px;")
+        self.scroll.setStyleSheet(
+            f"QScrollArea {{ background-color: {tema.SUPERFICIE}; border: 1px solid {tema.BORDA};"
+            f" border-radius: {tema.RAIO_G}px; }}"
+        )
         
         self.scroll_content = QWidget()
         self.layout_checks = QGridLayout(self.scroll_content) 
@@ -86,7 +86,7 @@ class DialogEscolherCasas(QDialog):
         botoes_layout = QHBoxLayout()
         botoes_layout.addStretch() 
         self.btn_ok = QPushButton("CONFIRMAR")
-        self.btn_ok.setStyleSheet(f"background-color: {COR_AZUL_DESTAQUE}; color: white; padding: 10px 20px; border-radius: 8px;")
+        self.btn_ok.setProperty("variante", "acento")
         self.btn_ok.setAutoDefault(False)
         self.btn_ok.setDefault(False)
         self.btn_ok.clicked.connect(self.confirmar_e_fechar)
@@ -100,7 +100,9 @@ class DialogEscolherCasas(QDialog):
     def alternar_modo_exclusao(self):
         self.modo_exclusao = not self.modo_exclusao
         self.btn_modo_exclusao.setText("Concluir" if self.modo_exclusao else "Excluir")
-        self.btn_modo_exclusao.setStyleSheet(f"background-color: transparent; color: {COR_VERMELHO};" if self.modo_exclusao else "background-color: transparent; color: #71717a;")
+        self.btn_modo_exclusao.setStyleSheet(
+            f"color: {COR_VERMELHO};" if self.modo_exclusao else ""
+        )
         for btn in self.botoes_deletar: btn.setVisible(self.modo_exclusao)
 
     def carregar_lista_casas(self, filtro=""):
@@ -138,7 +140,9 @@ class DialogEscolherCasas(QDialog):
             if not lista_casas: return
             
             lbl_titulo = QLabel(titulo)
-            lbl_titulo.setStyleSheet("color: #3b82f6; font-weight: bold; margin-top: 10px; margin-bottom: 5px;")
+            lbl_titulo.setStyleSheet(
+                f"color: {COR_AZUL_DESTAQUE}; font-weight: bold; margin-top: 10px; margin-bottom: 5px;"
+            )
             self.layout_checks.addWidget(lbl_titulo, row, 0, 1, 3)
             row += 1; col = 0
             
@@ -153,7 +157,10 @@ class DialogEscolherCasas(QDialog):
                     
                     btn_del = QPushButton("-")
                     btn_del.setFixedSize(24, 24)
-                    btn_del.setStyleSheet(f"color: #f87171; background: #27272a; border-radius: 6px;")
+                    btn_del.setStyleSheet(
+                        f"QPushButton {{ color: {COR_VERMELHO}; background: {tema.SUPERFICIE_ALTA};"
+                        f" border: none; border-radius: {tema.RAIO_P}px; padding: 0; }}"
+                    )
                     btn_del.clicked.connect(lambda _, c=casa: self.deletar_casa(c))
                     btn_del.setVisible(self.modo_exclusao) 
                     self.botoes_deletar.append(btn_del)
@@ -211,15 +218,7 @@ class DialogFiltros(QDialog):
             "data_fim": QDate.currentDate()
         }
         
-        self.setStyleSheet("""
-            QDialog { background-color: #09090b; }
-            QGroupBox { border: none; margin-top: 15px; padding-top: 15px; color: #f4f4f5; font-weight: bold;}
-            QLabel { color: #a1a1aa; font-weight: bold; }
-            QCheckBox { color: #f4f4f5; font-size: 14px; padding: 5px; }
-            QPushButton { background-color: #27272a; color: white; border-radius: 8px; padding: 10px; font-weight: bold; border: none; }
-            QDateEdit { background-color: #18181b; color: white; padding: 8px 12px; border: none; border-radius: 8px; outline: none; }
-            QDateEdit::drop-down { border: none; }
-        """)
+        self.setStyleSheet("QCheckBox { padding: 4px; }")
 
         layout = QVBoxLayout(self)
 
@@ -274,11 +273,11 @@ class DialogFiltros(QDialog):
 
         botoes = QHBoxLayout()
         btn_limpar = QPushButton("Limpar Filtros")
-        btn_limpar.setStyleSheet("background-color: transparent; color: #71717a;")
+        btn_limpar.setProperty("variante", "fantasma")
         btn_limpar.clicked.connect(self.limpar)
         
         btn_aplicar = QPushButton("APLICAR")
-        btn_aplicar.setStyleSheet(f"background-color: {COR_AZUL_DESTAQUE}; color: white;")
+        btn_aplicar.setProperty("variante", "acento")
         btn_aplicar.clicked.connect(self.aplicar)
         
         botoes.addWidget(btn_limpar); botoes.addWidget(btn_aplicar)
@@ -292,11 +291,11 @@ class DialogFiltros(QDialog):
             if sel:
                 self.lbl_casas.setText(" | ".join(sel)); self.lbl_casas.setStyleSheet(f"color: {COR_AZUL_DESTAQUE};")
             else:
-                self.lbl_casas.setText("Nenhuma selecionada"); self.lbl_casas.setStyleSheet("color: #a1a1aa;")
+                self.lbl_casas.setText("Nenhuma selecionada"); self.lbl_casas.setStyleSheet(f"color: {tema.TEXTO_SECUNDARIO};")
 
     def limpar(self):
         for chk in self.checks_tipos.values(): chk.setChecked(False)
-        self.lbl_casas.setText("Nenhuma selecionada"); self.lbl_casas.setStyleSheet("color: #a1a1aa;")
+        self.lbl_casas.setText("Nenhuma selecionada"); self.lbl_casas.setStyleSheet(f"color: {tema.TEXTO_SECUNDARIO};")
         self.data_inicio.setDate(QDate.currentDate().addDays(-30))
         self.data_fim.setDate(QDate.currentDate())
 
@@ -315,13 +314,9 @@ class DialogNovoProcedimento(QDialog):
         self.setMinimumWidth(600)
         self.setModal(True)
         
-        self.setStyleSheet("""
-            QDialog { background-color: #09090b; }
-            QGroupBox { border: none; margin-top: 10px; padding-top: 20px; color: #a1a1aa; font-weight: normal; font-size: 13px; }
-            QLabel { color: #f4f4f5; }
-            QLineEdit, QComboBox { background-color: #18181b; color: white; border: none; padding: 12px; border-radius: 8px; outline: none; }
-            QPushButton { background-color: #27272a; color: white; border-radius: 8px; padding: 10px; border: none;}
-        """)
+        self.setStyleSheet(
+            f"QGroupBox {{ color: {tema.TEXTO_SECUNDARIO}; font-weight: bold; font-size: 13px; }}"
+        )
 
         self.layout_principal = QVBoxLayout(self)
         self.layout_principal.setSizeConstraint(QVBoxLayout.SetFixedSize) 
@@ -387,9 +382,12 @@ class DialogNovoProcedimento(QDialog):
         self.grupo_valores.setLayout(self.layout_valores)
         self.layout_principal.addWidget(self.grupo_valores)
 
-        self.btn_add_obs = QPushButton("+ add observacao")
+        self.btn_add_obs = QPushButton("+ adicionar observação")
         self.btn_add_obs.setCursor(Qt.PointingHandCursor)
-        self.btn_add_obs.setStyleSheet("color: #71717a; background: transparent; text-align: left; font-size: 12px; padding: 0;")
+        self.btn_add_obs.setStyleSheet(
+            f"QPushButton {{ color: {tema.TEXTO_TERCIARIO}; background: transparent; border: none;"
+            " text-align: left; font-size: 12px; padding: 0; }"
+        )
         self.btn_add_obs.clicked.connect(self.mostrar_campo_obs)
         
         self.container_obs = QWidget()
@@ -399,7 +397,10 @@ class DialogNovoProcedimento(QDialog):
         self.input_obs.setPlaceholderText("Obs...")
         btn_remover_obs = QPushButton("-")
         btn_remover_obs.setFixedSize(38, 38)
-        btn_remover_obs.setStyleSheet("color: #71717a; background: #27272a; border-radius: 8px; font-weight: bold; font-size: 16px;")
+        btn_remover_obs.setStyleSheet(
+            f"QPushButton {{ color: {tema.TEXTO_TERCIARIO}; background: {tema.SUPERFICIE_ALTA};"
+            f" border: none; border-radius: {tema.RAIO_M}px; font-weight: bold; font-size: 16px; }}"
+        )
         btn_remover_obs.clicked.connect(self.esconder_campo_obs)
         lay_obs.addWidget(self.input_obs); lay_obs.addWidget(btn_remover_obs)
         self.container_obs.hide()
@@ -408,7 +409,9 @@ class DialogNovoProcedimento(QDialog):
         self.layout_principal.addWidget(self.container_obs)
 
         self.btn_salvar = QPushButton("SALVAR" if dados_edicao else "CRIAR PROCEDIMENTO")
-        self.btn_salvar.setStyleSheet(f"background-color: {COR_AZUL_DESTAQUE}; color: white; font-weight: bold; border-radius: 8px; height: 45px; margin-top: 20px;")
+        self.btn_salvar.setProperty("variante", "acento")
+        self.btn_salvar.setCursor(Qt.PointingHandCursor)
+        self.btn_salvar.setStyleSheet("QPushButton { height: 44px; margin-top: 16px; font-size: 15px; }")
         self.btn_salvar.clicked.connect(self.processar_e_salvar)
         self.layout_principal.addWidget(self.btn_salvar)
 
@@ -429,7 +432,7 @@ class DialogNovoProcedimento(QDialog):
                     self.lbl_casas_selecionadas.setStyleSheet(f"color: {COR_AZUL_DESTAQUE};")
             else: 
                 self.lbl_casa_freebet.setText("")
-                self.lbl_casa_freebet.setStyleSheet("color: #a1a1aa;")
+                self.lbl_casa_freebet.setStyleSheet(f"color: {tema.TEXTO_SECUNDARIO};")
 
     def abrir_seletor_casas(self):
         atuais = self.lbl_casas_selecionadas.text().split(" | ") if self.lbl_casas_selecionadas.text() != "Nenhuma selecionada" else []
@@ -444,13 +447,14 @@ class DialogNovoProcedimento(QDialog):
                     self.lbl_casa_freebet.setStyleSheet(f"color: {COR_AZUL_DESTAQUE};")
             else: 
                 self.lbl_casas_selecionadas.setText("Nenhuma selecionada")
-                self.lbl_casas_selecionadas.setStyleSheet("color: #a1a1aa;")
+                self.lbl_casas_selecionadas.setStyleSheet(f"color: {tema.TEXTO_SECUNDARIO};")
 
     def selecionar_tipo(self, tipo):
         self.tipo_selecionado = tipo
         for btn in self.botoes_tipo:
-            if btn.text() == tipo: btn.setStyleSheet("background-color: #f4f4f5; color: #09090b; font-weight: bold;")
-            else: btn.setStyleSheet("background-color: #27272a; color: #a1a1aa;")
+            btn.setProperty("variante", "primario" if btn.text() == tipo else "")
+            btn.style().unpolish(btn)
+            btn.style().polish(btn)
             
         is_cassino = (tipo == "Cassino")
         is_coleta = (tipo == "Coletar Freebet")
@@ -589,22 +593,24 @@ class TelaProcedimentos(QWidget):
         layout.setContentsMargins(40, 30, 40, 40)
         
         titulo = QLabel(f"Movimentações - {datetime.now().strftime('%B %Y').capitalize()}")
-        titulo.setStyleSheet("font-size: 22px; font-weight: bold; color: #f4f4f5;")
+        titulo.setStyleSheet(tema.estilo_titulo_tela())
         layout.addWidget(titulo)
         
         filtros_layout = QHBoxLayout()
 
         self.input_busca = QLineEdit()
         self.input_busca.setPlaceholderText("Buscar tipo, evento ou casa...")
-        self.input_busca.setStyleSheet("background-color: #18181b; color: white; padding: 10px; border: none; border-radius: 8px; outline: none;")
+        self.input_busca.setMinimumWidth(320)
         self.input_busca.textChanged.connect(self.carregar_tabela)
         
         self.btn_filtros = QPushButton("Filtros e Datas")
-        self.btn_filtros.setStyleSheet("background-color: #27272a; color: white; font-weight: bold; padding: 10px 20px; border-radius: 8px; border: none;")
+        self.btn_filtros.setCursor(Qt.PointingHandCursor)
         self.btn_filtros.clicked.connect(self.abrir_filtros)
         
         self.btn_abrir_modal = QPushButton("Nova Movimentação")
-        self.btn_abrir_modal.setStyleSheet("background-color: #f4f4f5; color: #09090b; border: none; font-weight: bold; padding: 10px 24px; border-radius: 8px;")
+        self.btn_abrir_modal.setProperty("variante", "primario")
+        self.btn_abrir_modal.setCursor(Qt.PointingHandCursor)
+        self.btn_abrir_modal.setStyleSheet("QPushButton { padding: 10px 22px; }")
         self.btn_abrir_modal.clicked.connect(lambda: self.abrir_pop_up())
 
         filtros_layout.addWidget(self.input_busca)
@@ -620,7 +626,7 @@ class TelaProcedimentos(QWidget):
         self.tabela.setColumnWidth(7, 50)
         
         self.tabela.horizontalHeader().setSectionResizeMode(0, QHeaderView.Fixed)
-        self.tabela.setColumnWidth(0, 90)
+        self.tabela.setColumnWidth(0, 110)
         self.tabela.horizontalHeader().setSectionResizeMode(5, QHeaderView.Fixed)
         self.tabela.setColumnWidth(5, 75)
 
@@ -635,19 +641,22 @@ class TelaProcedimentos(QWidget):
         self.ultimo_excluido = None
         self.btn_desfazer = QPushButton("Desfazer exclusão")
         self.btn_desfazer.setCursor(Qt.PointingHandCursor)
-        self.btn_desfazer.setStyleSheet("QPushButton { background-color: transparent; color: #71717a; font-weight: bold; font-size: 13px; border: none; } QPushButton:hover { color: #a1a1aa; }")
+        self.btn_desfazer.setProperty("variante", "fantasma")
+        self.btn_desfazer.setCursor(Qt.PointingHandCursor)
         self.btn_desfazer.clicked.connect(self.restaurar_excluido)
         self.btn_desfazer.hide()
 
-        self.tabela.setStyleSheet("""
-            QTableWidget { background-color: transparent; color: #f4f4f5; border: none; outline: none; font-size: 14px; gridline-color: transparent; }
-            QTableWidget::item { border: none; border-bottom: 1px solid rgba(255,255,255,0.03); padding: 5px; background: transparent; }
-            QTableWidget::item:selected { background-color: transparent; color: #f4f4f5; border: none; outline: none; }
-            QHeaderView::section { background-color: transparent; color: #71717a; font-weight: bold; border: none; border-bottom: 1px solid rgba(255,255,255,0.05); padding: 12px 8px; }
-        """)
+        self.tabela.setStyleSheet(
+            "QTableWidget::item:selected { background-color: transparent; color: %s; }" % tema.TEXTO
+        )
              
-        layout.addWidget(self.btn_desfazer, alignment=Qt.AlignRight)        
+        layout.addWidget(self.btn_desfazer, alignment=Qt.AlignRight)
         layout.addWidget(self.tabela)
+        self.aviso_vazio = AvisoTabelaVazia(
+            self.tabela,
+            "Nenhuma movimentação encontrada",
+            "Cadastre uma em “Nova Movimentação” ou revise a busca e os filtros.",
+        )
         self.carregar_tabela()
 
     def aplicar_filtro_externo(self, tipo):
@@ -709,9 +718,18 @@ class TelaProcedimentos(QWidget):
             btn_acoes = QPushButton("⋮")
             btn_acoes.setCursor(Qt.PointingHandCursor)
             
-            btn_acoes.setStyleSheet("QPushButton { color: #71717a; font-size: 16px; border: none; background: transparent; font-weight: bold; } QPushButton:hover { color: #f4f4f5; }")
+            btn_acoes.setStyleSheet(
+                f"QPushButton {{ color: {tema.TEXTO_TERCIARIO}; font-size: 16px; border: none;"
+                " background: transparent; font-weight: bold; padding: 0; }"
+                f"QPushButton:hover {{ color: {tema.TEXTO}; }}"
+            )
             menu = QMenu(self)
-            menu.setStyleSheet("QMenu { background-color: #18181b; color: #f4f4f5; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05); outline: none; } QMenu::item { padding: 10px 25px; } QMenu::item:selected { background-color: #27272a; }")
+            menu.setStyleSheet(
+                f"QMenu {{ background-color: {tema.SUPERFICIE}; color: {tema.TEXTO};"
+                f" border-radius: {tema.RAIO_M}px; border: 1px solid {tema.BORDA}; outline: none; padding: 4px; }}"
+                f"QMenu::item {{ padding: 9px 22px; border-radius: {tema.RAIO_P}px; }}"
+                f"QMenu::item:selected {{ background-color: {tema.SUPERFICIE_ALTA}; }}"
+            )
             if obs: 
                 menu.addAction("Ver Obs").triggered.connect(lambda checked=False, o=obs: self.mostrar_observacao(o))
             
@@ -721,6 +739,8 @@ class TelaProcedimentos(QWidget):
             
             btn_acoes.clicked.connect(lambda checked=False, m=menu, b=btn_acoes: m.exec(b.mapToGlobal(b.rect().bottomLeft())))
             self.tabela.setCellWidget(row, 7, btn_acoes)
+
+        self.aviso_vazio.atualizar()
 
     def atualizar_duplo_tela(self, state, id_op, base, duplo, row, save=True):
         final = base + (duplo if state == 2 or state == Qt.Checked else 0)
