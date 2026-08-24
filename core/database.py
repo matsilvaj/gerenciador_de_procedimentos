@@ -155,9 +155,11 @@ def salvar_procedimento(dados):
         dados.get('valor_da_freebet', 0.0), dados.get('ganhou_freebet', ''), dados.get('categoria_gasto', '')
     )
     cursor.execute(query, valores)
+    id_novo = cursor.lastrowid
     conexao.commit()
     conexao.close()
-    
+    return id_novo
+
 def atualizar_status_duplo(id_procedimento, bateu):
     conexao = conectar()
     cursor = conexao.cursor()

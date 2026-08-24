@@ -1,10 +1,12 @@
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QTableWidget,
     QTableWidgetItem, QHeaderView, QPushButton, QTabWidget, QComboBox,
-    QDialog, QDialogButtonBox, QAbstractItemView
+    QDialog, QDialogButtonBox, QAbstractItemView, QLineEdit, QFormLayout,
+    QCompleter
 )
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QColor, QBrush
+from datetime import datetime
 
 from core import database
 from telas.procedimentos import DialogNovoProcedimento, TabelaProcedimentos
@@ -216,6 +218,130 @@ class DialogSelecionarConversao(QDialog):
         self.accept()
 
 
+class DialogNovaFreebet(QDialog):
+    """Cadastro rapido de uma freebet: apenas casa e valor."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.dados_finais = None
+        self.setWindowTitle("Adicionar Freebet")
+        self.setMinimumWidth(420)
+        self.setStyleSheet("""
+            QDialog { background-color: #09090b; }
+            QLabel { color: #a1a1aa; font-size: 13px; font-weight: bold; }
+            QLineEdit {
+                background-color: #18181b; color: #f4f4f5; font-size: 14px;
+                border: 1px solid rgba(255,255,255,0.06); border-radius: 8px;
+                padding: 10px 12px;
+            }
+            QLineEdit:focus { border: 1px solid #3b82f6; }
+            QComboBox {
+                background-color: #18181b; color: #f4f4f5; font-size: 14px;
+                border: 1px solid rgba(255,255,255,0.06); border-radius: 8px;
+                padding: 10px 12px;
+            }
+            QComboBox::drop-down { border: none; width: 24px; }
+            QComboBox QAbstractItemView {
+                background-color: #18181b; color: #f4f4f5;
+                border: 1px solid rgba(255,255,255,0.06);
+                selection-background-color: #27272a;
+            }
+        """)
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setSpacing(14)
+
+        titulo = QLabel("Nova Freebet")
+        titulo.setStyleSheet("font-size: 18px; font-weight: bold; color: #f4f4f5;")
+        layout.addWidget(titulo)
+
+        subtitulo = QLabel("Informe a casa e o valor. A freebet entra como pendente e ja fica disponivel para conversao.")
+        subtitulo.setStyleSheet("font-size: 12px; font-weight: normal; color: #71717a;")
+        subtitulo.setWordWrap(True)
+        layout.addWidget(subtitulo)
+
+        formulario = QFormLayout()
+        formulario.setSpacing(10)
+        formulario.setLabelAlignment(Qt.AlignLeft)
+
+        self.combo_casa = QComboBox()
+        self.combo_casa.setEditable(True)
+        self.combo_casa.addItems(database.listar_casas())
+        self.combo_casa.setCurrentText("")
+        self.combo_casa.lineEdit().setPlaceholderText("Selecione ou digite uma casa")
+        self.combo_casa.completer().setCompletionMode(QCompleter.PopupCompletion)
+        self.combo_casa.completer().setCaseSensitivity(Qt.CaseInsensitive)
+
+        self.input_valor = QLineEdit()
+        self.input_valor.setPlaceholderText("0,00")
+        self.input_valor.returnPressed.connect(self.confirmar)
+
+        formulario.addRow("Casa", self.combo_casa)
+        formulario.addRow("Valor da freebet (R$)", self.input_valor)
+        layout.addLayout(formulario)
+
+        self.lbl_erro = QLabel("")
+        self.lbl_erro.setStyleSheet(f"color: {COR_VERMELHO}; font-size: 12px; font-weight: bold;")
+        self.lbl_erro.hide()
+        layout.addWidget(self.lbl_erro)
+
+        botoes = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        botoes.button(QDialogButtonBox.Ok).setText("Adicionar")
+        botoes.button(QDialogButtonBox.Cancel).setText("Cancelar")
+        botoes.accepted.connect(self.confirmar)
+        botoes.rejected.connect(self.reject)
+        layout.addWidget(botoes)
+
+        self.combo_casa.setFocus()
+
+    def mostrar_erro(self, mensagem):
+        self.lbl_erro.setText(mensagem)
+        self.lbl_erro.show()
+
+    def confirmar(self):
+        casa = self.combo_casa.currentText().strip()
+        if not casa:
+            self.mostrar_erro("Escolha ou digite a casa da freebet.")
+            self.combo_casa.setFocus()
+            return
+
+        texto_valor = self.input_valor.text().strip().replace("R$", "").strip()
+        if "," in texto_valor:
+            texto_valor = texto_valor.replace(".", "").replace(",", ".")
+        try:
+            valor = float(texto_valor)
+        except ValueError:
+            self.mostrar_erro("Valor invalido. Use apenas numeros, ex: 50,00.")
+            self.input_valor.setFocus()
+            return
+
+        if valor <= 0:
+            self.mostrar_erro("O valor da freebet precisa ser maior que zero.")
+            self.input_valor.setFocus()
+            return
+
+        agora = datetime.now()
+        self.dados_finais = {
+            "data_operacao": agora.strftime("%d/%m/%Y"),
+            "mes_referencia": agora.strftime("%m/%Y"),
+            "tipo_procedimento": "Coletar Freebet",
+            "casas_envolvidas": casa,
+            "casa_destino_freebet": casa,
+            "jogo_time_pa": "",
+            "lucro_final": 0.0,
+            "bateu_duplo": None,
+            "condicao_freebet": "",
+            "valor_freebet_coletada": 0.0,
+            "valor_da_freebet": valor,
+            "observacao": "",
+            "status_freebet": "Pendente",
+            "ganhou_freebet": "",
+            "categoria_gasto": "",
+        }
+        self.accept()
+
+
 class TelaFreebets(QWidget):
     sinal_converter_calculadora = Signal(str, float, list)
 
@@ -230,6 +356,16 @@ class TelaFreebets(QWidget):
         titulo = QLabel("Gest\u00e3o de Freebets")
         titulo.setStyleSheet("font-size: 22px; font-weight: bold; color: #f4f4f5;")
         topo.addWidget(titulo)
+        topo.addStretch()
+
+        self.btn_adicionar = QPushButton("+ Adicionar Freebet")
+        self.btn_adicionar.setCursor(Qt.PointingHandCursor)
+        self.btn_adicionar.setStyleSheet("""
+            QPushButton { background-color: #f4f4f5; color: #09090b; font-weight: bold; font-size: 13px; border-radius: 8px; padding: 9px 16px; border: none; }
+            QPushButton:hover { background-color: #d4d4d8; }
+        """)
+        self.btn_adicionar.clicked.connect(self.adicionar_freebet)
+        topo.addWidget(self.btn_adicionar)
         layout.addLayout(topo)
 
         self.btn_desfazer = QPushButton("\u21b6 Desfazer mudan\u00e7a")
@@ -352,6 +488,18 @@ class TelaFreebets(QWidget):
         )
         lay_btn.addWidget(btn_usar)
         return container_btn
+
+    def adicionar_freebet(self):
+        dialog = DialogNovaFreebet(self)
+        if not dialog.exec() or not dialog.dados_finais:
+            return
+
+        dados = dialog.dados_finais
+        database.adicionar_casa(dados["casa_destino_freebet"])
+        id_novo = database.salvar_procedimento(dados)
+        if id_novo:
+            self.registrar_acao_desfazer({"tipo": "nova_freebet", "id": id_novo})
+        self.carregar_freebets_ativas()
 
     def iniciar_conversao(self, casa, valor_total, freebets):
         if len(freebets) <= 1:
@@ -486,6 +634,8 @@ class TelaFreebets(QWidget):
                 estado.get('ganhou_freebet', ''),
                 estado.get('status_freebet', 'Pendente')
             )
+        elif acao['tipo'] == 'nova_freebet':
+            database.excluir_procedimento(acao['id'])
         elif acao['tipo'] == 'conversao':
             if acao.get('id_conversao'):
                 database.desfazer_conversao_freebet(
