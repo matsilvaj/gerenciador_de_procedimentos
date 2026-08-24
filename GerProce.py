@@ -10,6 +10,7 @@ from telas.freebets import TelaFreebets
 from telas.casas_apostas import TelaCasasApostas
 from telas.calculadora import TelaCalculadora
 from core import database
+from core import tema
 from PySide6.QtGui import QIcon, QKeySequence, QShortcut
 
 database.criar_tabelas()
@@ -53,6 +54,7 @@ class MainWindow(QMainWindow):
         for btn in [self.btn_dashboard, self.btn_procedimentos, self.btn_freebets, self.btn_casas, self.btn_calculadora, self.btn_historico]:
             btn.setCheckable(True)
             btn.setCursor(Qt.PointingHandCursor)
+            btn.setProperty("variante", "navegacao")
             top_bar_layout.addWidget(btn)
 
         self.telas = QStackedWidget()
@@ -91,29 +93,12 @@ class MainWindow(QMainWindow):
         self.mudar_tela(self.btn_dashboard, self.tela_dashboard)
 
     def aplicar_estilo(self):
-        estilo = """
-        * {
-            font-family: 'Inter', 'Segoe UI Variable', 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
-        }
-        QMainWindow { background-color: #09090b; }
-        #topBar { background-color: #09090b; border-bottom: 1px solid rgba(255,255,255,0.03); }
-        QPushButton {
-            background-color: transparent;
-            color: #a1a1aa;
-            font-size: 14px;
-            font-weight: 600;
-            padding: 8px 16px;
-            border: none;
-            border-radius: 6px;
-        }
-        QPushButton:hover { background-color: rgba(255,255,255,0.05); color: #f4f4f5; }
-        QPushButton:checked {
-            background-color: rgba(255,255,255,0.03);
-            color: #f4f4f5;
-            border: 1px solid rgba(255,255,255,0.05);
-        }
-        """
-        self.setStyleSheet(estilo)
+        # Aplicado na aplicacao inteira para alcancar tambem dialogos e QMessageBox.
+        app = QApplication.instance()
+        if app:
+            app.setStyleSheet(tema.ESTILO_GLOBAL)
+        else:
+            self.setStyleSheet(tema.ESTILO_GLOBAL)
 
     def ir_para_calculadora_com_freebet(self, casa, valor_total, ids):
         # Preenche as informações na calculadora
