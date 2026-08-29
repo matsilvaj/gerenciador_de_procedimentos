@@ -136,6 +136,23 @@ class TelaHistorico(QWidget):
         self.chart_view = QChartView()
         self.chart_view.setRenderHint(QPainter.Antialiasing)
         self.chart_view.setStyleSheet("background: transparent;")
+
+        # O grafico e a serie sao criados uma unica vez e reaproveitados. Trocar
+        # o QChart a cada atualizacao devolvia a posse do anterior para o Python
+        # e o objeto acabava liberado duas vezes, derrubando o app.
+        self.grafico_pizza = QChart()
+        self.grafico_pizza.setBackgroundBrush(QBrush(Qt.transparent))
+        self.grafico_pizza.setMargins(QMargins(0, 0, 0, 0))
+        self.grafico_pizza.legend().hide()
+
+        self.serie_pizza = QPieSeries()
+        self.serie_pizza.setPieSize(0.8)
+        self.serie_pizza.setLabelsVisible(True)
+        self.serie_pizza.setLabelsPosition(QPieSlice.LabelOutside)
+        self.serie_pizza.hovered.connect(self.ao_passar_mouse_pizza)
+
+        self.grafico_pizza.addSeries(self.serie_pizza)
+        self.chart_view.setChart(self.grafico_pizza)
         lay_pizza.addWidget(self.chart_view)
 
         self.tt_pizza = QLabel(self.chart_view)
@@ -256,33 +273,26 @@ class TelaHistorico(QWidget):
             f"color: {cor_total}; font-size: 30px; font-weight: bold; background: transparent;"
         )
 
-        chart = QChart()
-        chart.setBackgroundBrush(QBrush(Qt.transparent))
-        chart.setMargins(QMargins(0, 0, 0, 0))
-        chart.legend().hide()
-        series = QPieSeries()
+        # Repoe as fatias da serie ja existente, sem trocar o grafico.
+        self.tt_pizza.hide()
+        self.serie_pizza.clear()
 
-        if v_ganhos > 0:
-            s_ganhos = series.append("Ganhos", v_ganhos)
-            s_ganhos.setColor(QColor(tema.COR_POSITIVO))
-            s_ganhos.setLabelBrush(QColor(tema.TEXTO))
-        if v_gastos > 0:
-            s_gastos = series.append("Gastos", v_gastos)
-            s_gastos.setColor(QColor(tema.COR_NEGATIVO))
-            s_gastos.setLabelBrush(QColor(tema.TEXTO))
-        if v_invest > 0:
-            s_invest = series.append("Investimento", v_invest)
-            s_invest.setColor(QColor(tema.AZUL))
-            s_invest.setLabelBrush(QColor(tema.TEXTO))
-        
-        series.setPieSize(0.8)
-        series.setLabelsVisible(True)
-        series.setLabelsPosition(QPieSlice.LabelOutside)
-        
-        series.hovered.connect(self.ao_passar_mouse_pizza)
+        fatias = (
+            ("Ganhos", v_ganhos, tema.COR_POSITIVO),
+            ("Gastos", v_gastos, tema.COR_NEGATIVO),
+            ("Investimento", v_invest, tema.AZUL),
+        )
+        for rotulo, valor, cor in fatias:
+            if valor > 0:
+                fatia = self.serie_pizza.append(rotulo, valor)
+                fatia.setColor(QColor(cor))
+                fatia.setLabelBrush(QColor(tema.TEXTO))
+                fatia.setLabelVisible(True)
 
-        chart.addSeries(series)
-        self.chart_view.setChart(chart)
+        # Precisa ser reaplicado: a visibilidade dos rotulos vale para as fatias
+        # que existem no momento da chamada, nao para as que forem criadas depois.
+        self.serie_pizza.setLabelsVisible(True)
+        self.serie_pizza.setLabelsPosition(QPieSlice.LabelOutside)
 
     def eventFilter(self, observado, evento):
         if evento.type() == QEvent.Leave:
