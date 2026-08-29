@@ -26,6 +26,12 @@ COR_VERMELHO = tema.COR_NEGATIVO
 COR_AZUL_DESTAQUE = tema.COR_DESTAQUE
 TIPOS_MOVIMENTACAO = ["SureBet", "Tentativa de Duplo", "Coletar Freebet", "Converter Freebet", "Cassino", "Ganho", "Gasto", "Investimento"]
 TIPOS_SIMPLES = ["Ganho", "Gasto", "Investimento"]
+# Janela padrao da tela de Movimentacoes, contando o dia de hoje.
+DIAS_PADRAO_MOVIMENTACOES = 7
+
+
+def data_inicio_padrao():
+    return QDate.currentDate().addDays(-(DIAS_PADRAO_MOVIMENTACOES - 1))
 
 class CheckBoxContainer(QWidget):
     def __init__(self, checkbox):
@@ -214,7 +220,7 @@ class DialogFiltros(QDialog):
         self.filtros_atuais = filtros_atuais if filtros_atuais else {
             "tipos": [], 
             "casas": [],
-            "data_inicio": QDate.currentDate().addDays(-30),
+            "data_inicio": data_inicio_padrao(),
             "data_fim": QDate.currentDate()
         }
         
@@ -229,7 +235,7 @@ class DialogFiltros(QDialog):
         self.data_inicio.setDisplayFormat("dd/MM/yyyy")
         self.data_inicio.setCalendarPopup(True)
         self.data_inicio.setMinimumWidth(125)
-        self.data_inicio.setDate(self.filtros_atuais.get("data_inicio", QDate.currentDate().addDays(-30)))
+        self.data_inicio.setDate(self.filtros_atuais.get("data_inicio", data_inicio_padrao()))
         
         self.data_fim = QDateEdit()
         self.data_fim.setDisplayFormat("dd/MM/yyyy")
@@ -296,7 +302,7 @@ class DialogFiltros(QDialog):
     def limpar(self):
         for chk in self.checks_tipos.values(): chk.setChecked(False)
         self.lbl_casas.setText("Nenhuma selecionada"); self.lbl_casas.setStyleSheet(f"color: {tema.TEXTO_SECUNDARIO};")
-        self.data_inicio.setDate(QDate.currentDate().addDays(-30))
+        self.data_inicio.setDate(data_inicio_padrao())
         self.data_fim.setDate(QDate.currentDate())
 
     def aplicar(self):
@@ -585,16 +591,24 @@ class TelaProcedimentos(QWidget):
         self.filtros_avancados = {
             "tipos": [], 
             "casas": [],
-            "data_inicio": QDate.currentDate().addDays(-30),
+            "data_inicio": data_inicio_padrao(),
             "data_fim": QDate.currentDate()
         }
         
         layout = QVBoxLayout(self)
         layout.setContentsMargins(40, 30, 40, 40)
         
-        titulo = QLabel(f"Movimentações - {datetime.now().strftime('%B %Y').capitalize()}")
+        titulo = QLabel("Movimentações")
         titulo.setStyleSheet(tema.estilo_titulo_tela())
         layout.addWidget(titulo)
+
+        # O titulo antes mostrava o mes, mas o filtro sempre foi por janela de
+        # dias; agora o periodo aplicado fica escrito aqui.
+        self.lbl_periodo = QLabel("")
+        self.lbl_periodo.setStyleSheet(
+            f"color: {tema.TEXTO_TERCIARIO}; font-size: 13px; background: transparent;"
+        )
+        layout.addWidget(self.lbl_periodo)
         
         filtros_layout = QHBoxLayout()
 
@@ -655,13 +669,23 @@ class TelaProcedimentos(QWidget):
         self.aviso_vazio = AvisoTabelaVazia(
             self.tabela,
             "Nenhuma movimentação encontrada",
-            "Cadastre uma em “Nova Movimentação” ou revise a busca e os filtros.",
+            f"A tela mostra os últimos {DIAS_PADRAO_MOVIMENTACOES} dias. "
+            "Amplie o período em “Filtros e Datas” ou cadastre em “Nova Movimentação”.",
         )
         self.carregar_tabela()
 
     def aplicar_filtro_externo(self, tipo):
         self.filtros_avancados["tipos"] = [tipo]
         self.carregar_tabela()
+
+    def atualizar_rotulo_periodo(self, dt_in, dt_out):
+        """Escreve embaixo do titulo qual periodo esta sendo mostrado."""
+        texto = f"{dt_in.toString('dd/MM/yyyy')} a {dt_out.toString('dd/MM/yyyy')}"
+        if dt_in == data_inicio_padrao() and dt_out == QDate.currentDate():
+            texto += f" · últimos {DIAS_PADRAO_MOVIMENTACOES} dias"
+        else:
+            texto += " · período do filtro"
+        self.lbl_periodo.setText(texto)
 
     def carregar_tabela(self):
         self.tabela.setRowCount(0)
@@ -670,8 +694,9 @@ class TelaProcedimentos(QWidget):
         
         cursor.execute("SELECT id, data_operacao, tipo_procedimento, jogo_time_pa, casas_envolvidas, lucro_final, valor_freebet_coletada, bateu_duplo, condicao_freebet, observacao, casa_destino_freebet, valor_da_freebet, categoria_gasto FROM Procedimentos_Historico ORDER BY id DESC")
         
-        dt_in = self.filtros_avancados.get("data_inicio", QDate.currentDate().addDays(-30))
+        dt_in = self.filtros_avancados.get("data_inicio", data_inicio_padrao())
         dt_out = self.filtros_avancados.get("data_fim", QDate.currentDate())
+        self.atualizar_rotulo_periodo(dt_in, dt_out)
 
         for d_t in cursor.fetchall():
             id_op, data_str, tipo, jogo, casas, lucro, v_duplo, bateu, cond, obs, casa_fb, v_fb, cat_gasto = d_t
