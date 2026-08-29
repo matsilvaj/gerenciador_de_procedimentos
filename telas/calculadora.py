@@ -186,7 +186,11 @@ class TelaCalculadora(QWidget):
     def atualizar_indicador_adv(self, idx):
         """Muda o estilo do botao avancado se houver opcoes ativas na linha."""
         l = self.linhas_sure[idx]
-        tem_algo = bool(l["inp_aum"].text().strip() or l["inp_com"].text().strip() or l["inp_cash"].text().strip() or l["chk_fb"].isChecked())
+        tem_algo = bool(
+            l["inp_aum"].text().strip() or l["inp_com"].text().strip()
+            or l["inp_cash"].text().strip() or l["chk_fb"].isChecked()
+            or l["inp_fb_parcial"].text().strip()
+        )
    
         sinal = "^" if l["container_adv"].isVisible() else "v"
         
@@ -195,6 +199,28 @@ class TelaCalculadora(QWidget):
             l["btn_adv"].setStyleSheet(ESTILO_MINI_ATIVO)
         else:
             l["btn_adv"].setStyleSheet(ESTILO_MINI)
+
+    def valor_fb_parcial(self, l):
+        """Valor em freebet da linha, ou 0 se o campo estiver vazio/invalido."""
+        if l["chk_fb"].isChecked() or l["btn_tipo"].text() == "L":
+            return 0.0
+        texto = l["inp_fb_parcial"].text().strip().replace(",", ".")
+        if not texto:
+            return 0.0
+        try:
+            valor = float(texto)
+        except ValueError:
+            return 0.0
+        return valor if valor > 0 else 0.0
+
+    def atualizar_estado_fb_parcial(self, idx):
+        """A freebet parcial nao faz sentido em linha de freebet cheia nem em Lay."""
+        l = self.linhas_sure[idx]
+        indisponivel = l["chk_fb"].isChecked() or l["btn_tipo"].text() == "L"
+        l["inp_fb_parcial"].setEnabled(not indisponivel)
+        l["lbl_fb_parcial"].setEnabled(not indisponivel)
+        if indisponivel:
+            l["lbl_fb_seu"].setText("")
 
     def atualizar_indicador_fixar(self, idx):
         if idx >= len(self.linhas_sure):
@@ -232,6 +258,7 @@ class TelaCalculadora(QWidget):
          
                 "tipo": l["btn_tipo"].text(), "aum": l["inp_aum"].text(), "com": l["inp_com"].text(),
                 "cash": l["inp_cash"].text(), "freebet": l["chk_fb"].isChecked(), "adv_vis": l["container_adv"].isVisible(),
+                "fb_parcial": l["inp_fb_parcial"].text(),
                 "stake_manual": l.get("stake_manual", False)
             })
 
@@ -355,11 +382,26 @@ class TelaCalculadora(QWidget):
             chk_fb = QCheckBox("Freebet (Só Lucro)")
             chk_fb.setStyleSheet(f"QCheckBox {{ color: {tema.TEXTO}; font-weight: bold; margin-left: 10px; }}")
 
+            lbl_fb_parcial = QLabel("Freebet parcial R$:")
+            inp_fb_parcial = QLineEdit()
+            inp_fb_parcial.setFixedWidth(70)
+            inp_fb_parcial.setPlaceholderText("0,00")
+            inp_fb_parcial.setToolTip(
+                "Parte da stake desta linha que vem de freebet e nao sai do seu bolso.\n"
+                "A stake total e recalculada para manter a protecao equilibrada."
+            )
+            lbl_fb_seu = QLabel("")
+            lbl_fb_seu.setStyleSheet(
+                f"color: {tema.TEXTO_TERCIARIO}; font-weight: normal; font-size: 12px;"
+            )
+
             a_lay.addStretch()
             a_lay.addWidget(lbl_aum); a_lay.addWidget(inp_aum); a_lay.addSpacing(15)
             a_lay.addWidget(lbl_com); a_lay.addWidget(inp_com); a_lay.addSpacing(15)
             a_lay.addWidget(lbl_cash); a_lay.addWidget(inp_cash); a_lay.addSpacing(15)
-            a_lay.addWidget(chk_fb)
+            a_lay.addWidget(chk_fb); a_lay.addSpacing(15)
+            a_lay.addWidget(lbl_fb_parcial); a_lay.addWidget(inp_fb_parcial)
+            a_lay.addWidget(lbl_fb_seu)
             a_lay.addStretch()
             
             adv_row.hide()
@@ -373,6 +415,7 @@ class TelaCalculadora(QWidget):
                 "odd": inp_odd, "stake": inp_stake, "inp_resp": inp_resp, "btn_tipo": btn_tipo, 
                 "lucro_lbl": lbl_lucro, "btn_fixar": btn_fixar, "btn_adv": btn_adv, "container_adv": adv_row,
                 "inp_aum": inp_aum, "inp_com": inp_com, "inp_cash": inp_cash, "chk_fb": chk_fb,
+                "inp_fb_parcial": inp_fb_parcial, "lbl_fb_parcial": lbl_fb_parcial, "lbl_fb_seu": lbl_fb_seu,
                 "stake_manual": False
             })
             
@@ -388,6 +431,7 @@ class TelaCalculadora(QWidget):
                     b.setText("B")
                     b.setStyleSheet(ESTILO_MINI_BACK)
                     resp.hide()
+                self.atualizar_estado_fb_parcial(idx)
                 self.sincronizar_campos(idx, "odd")
                 self.calcular_surebet()
 
@@ -407,12 +451,15 @@ class TelaCalculadora(QWidget):
                 inp_odd.setText(e["odd"]); inp_stake.setText(e["stake"]); inp_resp.setText(e["resp"])
                 inp_aum.setText(e["aum"]); inp_com.setText(e["com"]); inp_cash.setText(e["cash"])
                 chk_fb.setChecked(e["freebet"])
+                inp_fb_parcial.setText(e.get("fb_parcial", ""))
                 self.linhas_sure[i]["stake_manual"] = e.get("stake_manual", False)
                 if e["tipo"] == "L":
          
                     btn_tipo.setText("L"); btn_tipo.setStyleSheet(ESTILO_MINI_LAY)
                     inp_resp.show()
                 if e["adv_vis"]: adv_row.show()
+
+            self.atualizar_estado_fb_parcial(i)
 
             inp_odd.textEdited.connect(lambda txt, idx=i: self.on_text_edited(idx, "odd"))
             inp_stake.textEdited.connect(lambda txt, idx=i: self.on_text_edited(idx, "stake"))
@@ -425,6 +472,10 @@ class TelaCalculadora(QWidget):
             
             chk_fb.stateChanged.connect(self.calcular_surebet)
             chk_fb.stateChanged.connect(lambda state, idx=i: self.atualizar_indicador_adv(idx))
+            chk_fb.stateChanged.connect(lambda state, idx=i: self.atualizar_estado_fb_parcial(idx))
+            inp_fb_parcial.textEdited.connect(lambda txt: self.calcular_surebet())
+            inp_fb_parcial.textEdited.connect(lambda txt, idx=i: self.atualizar_indicador_adv(idx))
+            inp_fb_parcial.returnPressed.connect(inp_fb_parcial.focusNextChild)
             
             
             self.atualizar_indicador_adv(i)
@@ -449,6 +500,8 @@ class TelaCalculadora(QWidget):
             l["inp_com"].setText("")
             l["inp_cash"].setText("")
             l["chk_fb"].setChecked(False)
+            l["inp_fb_parcial"].setText("")
+            l["lbl_fb_seu"].setText("")
             l["stake_manual"] = False
             if l["btn_tipo"].text() == "L":
                 l["btn_tipo"].setText("B")
@@ -532,77 +585,119 @@ class TelaCalculadora(QWidget):
             l["inp_resp"].blockSignals(True)
             
         try:
-            for l in self.linhas_sure:
-                o_str = l["odd"].text().replace(',', '.')
-                o_raw = float(o_str) if o_str else 0.0
+            # Se a freebet informada for maior que a stake que a linha precisa, a
+            # linha vira freebet cheia e o calculo e refeito uma vez com esse ajuste.
+            forcar_fb_cheia = {}
+            for _passada in range(2):
+              for l in self.linhas_sure:
+                  o_str = l["odd"].text().replace(',', '.')
+                  o_raw = float(o_str) if o_str else 0.0
              
-                aum = float(l["inp_aum"].text().replace(',', '.')) if l["inp_aum"].text() else 0.0
-                com = float(l["inp_com"].text().replace(',', '.')) if l["inp_com"].text() else 0.0
-                cash = float(l["inp_cash"].text().replace(',', '.')) if l["inp_cash"].text() else 0.0
-                is_fb = l["chk_fb"].isChecked()
-                is_lay = l["btn_tipo"].text() == "L"
+                  aum = float(l["inp_aum"].text().replace(',', '.')) if l["inp_aum"].text() else 0.0
+                  com = float(l["inp_com"].text().replace(',', '.')) if l["inp_com"].text() else 0.0
+                  cash = float(l["inp_cash"].text().replace(',', '.')) if l["inp_cash"].text() else 0.0
+                  is_fb = l["chk_fb"].isChecked()
+                  is_lay = l["btn_tipo"].text() == "L"
       
                 
-                o_eff = 1 + (o_raw - 1) * (1 + aum/100)
+                  o_eff = 1 + (o_raw - 1) * (1 + aum/100)
                 
-                if is_lay:
-                    M = (o_eff - 1) + (1 - com/100) - (o_eff - 1) * (cash/100)
-                    k = (o_eff - 1)
-                    b = (o_eff - 1) * (cash/100)
-                else:
-                    if is_fb:
-          
-                        M = (o_eff - 1) * (1 - com/100)
-                        k = 0 
-                        b = 0 
-                    else:
-    
-                        M = 1 + (o_eff - 1) * (1 - com/100) - (cash/100)
-                        k = 1
-                        b = cash/100
-                
-         
-                l["math"] = {"M": M, "k": k, "b": b, "o_eff": o_eff, "is_lay": is_lay}
+                  # Parte da stake paga com freebet (nao sai do bolso e nao volta).
+                  fb = 0.0 if forcar_fb_cheia.get(id(l)) else self.valor_fb_parcial(l)
+                  if forcar_fb_cheia.get(id(l)):
+                      is_fb = True
 
-            b_idx = self.stake_fixa_index if self.stake_fixa_index is not None else self.last_edited_index
-            if b_idx >= len(self.linhas_sure): b_idx = 0
-            base_str = self.linhas_sure[b_idx]["stake"].text().replace(',', '.')
-            if not base_str: raise Exception("Vazio")
+                  if is_lay:
+                      M = (o_eff - 1) + (1 - com/100) - (o_eff - 1) * (cash/100)
+                      k = (o_eff - 1)
+                      b = (o_eff - 1) * (cash/100)
+                      M0 = k0 = b0 = 0.0
+                  elif is_fb:
+                      M = (o_eff - 1) * (1 - com/100)
+                      k = 0
+                      b = 0
+                      M0 = k0 = b0 = 0.0
+                  else:
+                      M = 1 + (o_eff - 1) * (1 - com/100) - (cash/100)
+                      k = 1
+                      b = cash/100
+                      # Retorno, custo e cashback perdem a parte referente a freebet:
+                      # ela nao e devolvida, nao foi paga e nao gera cashback.
+                      M0 = -fb * (1 - cash/100)
+                      k0 = -fb
+                      b0 = -fb * (cash/100)
+
+                  l["math"] = {"M": M, "k": k, "b": b, "M0": M0, "k0": k0, "b0": b0,
+                               "fb": fb, "o_eff": o_eff, "is_lay": is_lay}
+
+              b_idx = self.stake_fixa_index if self.stake_fixa_index is not None else self.last_edited_index
+              if b_idx >= len(self.linhas_sure): b_idx = 0
+              base_str = self.linhas_sure[b_idx]["stake"].text().replace(',', '.')
+              if not base_str: raise Exception("Vazio")
   
-            s_base = float(base_str)
+              s_base = float(base_str)
             
-            modelo = self.combo_modelo.currentText()
-            stakes = [0.0] * len(self.linhas_sure)
-            stakes[b_idx] = s_base
+              modelo = self.combo_modelo.currentText()
+              stakes = [0.0] * len(self.linhas_sure)
+              stakes[b_idx] = s_base
 
-            if "0x0" in modelo:
-                soma_W = 0
-                for j in range(1, len(self.linhas_sure)):
-                    calc = self.linhas_sure[j]["math"]
-                    if calc["M"] > 0: soma_W += (calc["k"] - calc["b"]) / calc["M"]
-                
-           
-                if b_idx == 0:
-                    c1 = self.linhas_sure[0]["math"]
-                    nr_outros = (s_base * (c1["M"] - (c1["k"] - c1["b"]))) / soma_W if soma_W > 0 else 0
-                    for j in range(1, len(self.linhas_sure)):
-          
-                        if self.linhas_sure[j]["math"]["M"] > 0: stakes[j] = nr_outros / self.linhas_sure[j]["math"]["M"]
-                else:
-                    nr_outros = s_base * self.linhas_sure[b_idx]["math"]["M"]
-                    for j in range(1, len(self.linhas_sure)):
-              
-                        if j != b_idx and self.linhas_sure[j]["math"]["M"] > 0: stakes[j] = nr_outros / self.linhas_sure[j]["math"]["M"]
-                    c1 = self.linhas_sure[0]["math"]
-                    num = nr_outros * soma_W
-                    den = c1["M"] - (c1["k"] - c1["b"])
-      
-                    stakes[0] = num / den if den != 0 else 0
-            else:
-                nr_alvo = s_base * self.linhas_sure[b_idx]["math"]["M"]
-                for j in range(len(self.linhas_sure)):
-                    if j != b_idx and self.linhas_sure[j]["math"]["M"] > 0:
-                        stakes[j] = nr_alvo / self.linhas_sure[j]["math"]["M"]
+              if "0x0" in modelo:
+                  soma_W = 0
+                  # C junta o que as parcelas fixas de freebet tiram do investimento
+                  # das linhas 1..n; com freebet zerada ele vale 0 e a conta e a antiga.
+                  C = 0.0
+                  for j in range(1, len(self.linhas_sure)):
+                      calc = self.linhas_sure[j]["math"]
+                      if calc["M"] > 0:
+                          soma_W += (calc["k"] - calc["b"]) / calc["M"]
+                          C += (calc["k0"] - calc["b0"]) - calc["M0"] * (calc["k"] - calc["b"]) / calc["M"]
+
+                  if b_idx == 0:
+                      c1 = self.linhas_sure[0]["math"]
+                      if soma_W > 0:
+                          nr_outros = (s_base * (c1["M"] - (c1["k"] - c1["b"]))
+                                       + c1["M0"] - (c1["k0"] - c1["b0"]) - C) / soma_W
+                      else:
+                          nr_outros = 0
+                      for j in range(1, len(self.linhas_sure)):
+                          cj = self.linhas_sure[j]["math"]
+                          if cj["M"] > 0: stakes[j] = (nr_outros - cj["M0"]) / cj["M"]
+                  else:
+                      cb_ = self.linhas_sure[b_idx]["math"]
+                      nr_outros = s_base * cb_["M"] + cb_["M0"]
+                      for j in range(1, len(self.linhas_sure)):
+                          cj = self.linhas_sure[j]["math"]
+                          if j != b_idx and cj["M"] > 0: stakes[j] = (nr_outros - cj["M0"]) / cj["M"]
+                      c1 = self.linhas_sure[0]["math"]
+                      num = nr_outros * soma_W + C - c1["M0"] + (c1["k0"] - c1["b0"])
+                      den = c1["M"] - (c1["k"] - c1["b"])
+                      stakes[0] = num / den if den != 0 else 0
+              else:
+                  cb_ = self.linhas_sure[b_idx]["math"]
+                  nr_alvo = s_base * cb_["M"] + cb_["M0"]
+                  for j in range(len(self.linhas_sure)):
+                      cj = self.linhas_sure[j]["math"]
+                      if j != b_idx and cj["M"] > 0:
+                          stakes[j] = (nr_alvo - cj["M0"]) / cj["M"]
+
+              # Nenhuma linha pode ter mais freebet do que stake: nesse caso ela
+              # passa a ser tratada como freebet cheia e o calculo se repete.
+              precisa_refazer = False
+              for i, l in enumerate(self.linhas_sure):
+                  c = l["math"]
+                  if not c["fb"]:
+                      continue
+                  if i == b_idx:
+                      s_prev = s_base
+                  elif l.get("stake_manual") and l["stake"].text().strip():
+                      s_prev = float(l["stake"].text().replace(',', '.'))
+                  else:
+                      s_prev = stakes[i]
+                  if c["fb"] > s_prev + 0.005 and not forcar_fb_cheia.get(id(l)):
+                      forcar_fb_cheia[id(l)] = True
+                      precisa_refazer = True
+              if not precisa_refazer:
+                  break
 
             custo_total = 0.0
             cashback_total = 0.0
@@ -636,9 +731,17 @@ class TelaCalculadora(QWidget):
                     l["inp_resp"].setText(f"{s_final * c['o_eff'] - s_final:.2f}")
       
                 
-                custo = s_final * c["k"]
-                cb = s_final * c["b"]
-                nr = s_final * c["M"]
+                custo = s_final * c["k"] + c["k0"]
+                cb = s_final * c["b"] + c["b0"]
+                nr = s_final * c["M"] + c["M0"]
+
+                # Mostra, ao lado do campo, quanto da stake saiu do bolso.
+                if c["fb"] > 0:
+                    l["lbl_fb_seu"].setText(f"(seu: R$ {max(s_final - c['fb'], 0.0):.2f})")
+                elif forcar_fb_cheia.get(id(l)):
+                    l["lbl_fb_seu"].setText("(freebet cobre a stake inteira)")
+                else:
+                    l["lbl_fb_seu"].setText("")
                 
               
                 custo_total += custo
